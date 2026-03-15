@@ -3,6 +3,7 @@ import express from "express";
 import multer from "multer";
 import ExcelJS from "exceljs";
 import path from "path";
+import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 
 const app = express();
 const PORT = 3000;
@@ -17,7 +18,9 @@ app.post("/upload", upload.single("file"), async (req: Request, res: Response) =
     const fileBuffer = req.file.buffer;
 
     const fileContent = fileBuffer.toString("utf-8");
-    const data: Record<string, string> = eval(fileContent);
+    const fixedContent = wrapJsFileContent(fileContent);
+
+    const data: Record<string, string> = eval(fixedContent);
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('App');
@@ -59,6 +62,8 @@ app.post("/upload", upload.single("file"), async (req: Request, res: Response) =
     );
     res.send(buffer);
   } catch (err) {
+    console.log('check err', err);
+
     console.error(err);
     res.status(500).send("Error processing file");
   }
