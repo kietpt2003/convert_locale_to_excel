@@ -3,21 +3,21 @@ import express from "express";
 import multer from "multer";
 import ExcelJS from "exceljs";
 import path from "path";
-import fs from "fs";
 
 const app = express();
 const PORT = 3000;
 
-const upload = multer({ dest: "uploads/" });
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 app.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) return res.status(400).send("No file uploaded");
 
-    const filePath = path.resolve(req.file.path);
+    const fileBuffer = req.file.buffer;
 
-    const dataModule = await import(filePath);
-    const data = dataModule.default || dataModule;
+    const fileContent = fileBuffer.toString("utf-8");
+    const data: Record<string, string> = eval(fileContent);
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('App');
@@ -47,15 +47,17 @@ app.post("/upload", upload.single("file"), async (req: Request, res: Response) =
     sheet.getColumn(2).width = 50;
     sheet.getRow(1).height = 30;
 
-    const excelFilePath = path.resolve("translations_key.xlsx");
-    await workbook.xlsx.writeFile(excelFilePath);
+    const buffer = await workbook.xlsx.writeBuffer();
 
-    fs.unlinkSync(filePath);
-
-    res.download(excelFilePath, "translations_key.xlsx", (err) => {
-      if (err) console.error(err);
-      fs.unlinkSync(excelFilePath);
-    });
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="translations_key.xlsx"'
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.send(buffer);
   } catch (err) {
     console.error(err);
     res.status(500).send("Error processing file");
