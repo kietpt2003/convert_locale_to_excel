@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Upload Key File to Excel</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 40px;
+        background-color: #f4f4f9;
+        color: #333;
+      }
+
+      h1 {
+        text-align: center;
+        color: #222;
+        margin-bottom: 30px;
+      }
+
+      .container {
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 30px 20px;
+        background-color: #fff;
+        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+        border-radius: 10px;
+        text-align: center;
+        position: relative;
+      }
+
+      .avatar-wrapper {
+        position: relative;
+        display: inline-block;
+      }
+
+      .developer-avatar {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 3px solid #4caf50;
+      }
+
+      /* Dấu tick xanh */
+      .verified-badge {
+        position: absolute;
+        bottom: 5px;
+        right: 5px;
+        width: 28px;
+        height: 28px;
+        background-color: #4caf50;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid white;
+      }
+
+      .verified-badge::after {
+        content: "✓";
+        color: white;
+        font-weight: bold;
+        font-size: 16px;
+      }
+
+      .developer-name {
+        font-weight: bold;
+        font-size: 22px;
+        margin-top: 15px;
+        margin-bottom: 10px;
+        word-wrap: break-word; /* tên dài sẽ xuống dòng */
+      }
+
+      .developer-links {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .developer-links a {
+        flex: 1;
+        display: block;
+      }
+
+      .developer-links img {
+        width: 120px; /* nhỏ hơn trước */
+        height: 32px; /* đồng bộ chiều cao */
+        object-fit: cover;
+        border-radius: 5px;
+      }
+
+      .upload-section {
+        margin-top: 20px;
+      }
+
+      input[type="file"] {
+        margin-bottom: 10px;
+      }
+
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        cursor: pointer;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: background-color 0.2s;
+      }
+
+      button:hover {
+        background-color: #45a049;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Upload Key File & Download Excel</h1>
+    <div class="container">
+      <div class="avatar-wrapper">
+        <img
+          class="developer-avatar"
+          src="assets/avatar.JPG"
+          alt="Developer Avatar"
+        />
+        <div class="verified-badge"></div>
+      </div>
+
+      <div class="developer-name">
+        Phạm Tuấn Kiệt – Fullstack Developer & React Native Specialist
+      </div>
+
+      <div class="developer-links">
+        <a href="https://www.facebook.com/tuankiet29012003" target="_blank">
+          <img
+            src="https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white"
+          />
+        </a>
+        <a href="https://www.linkedin.com/in/kietpt2003" target="_blank">
+          <img
+            src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white"
+          />
+        </a>
+      </div>
+
+      <div class="upload-section">
+        <input type="file" id="fileInput" />
+        <br />
+        <button id="uploadBtn">Upload & Download</button>
+      </div>
+    </div>
+
+    <script>
+      const btn = document.getElementById("uploadBtn");
+      const fileInput = document.getElementById("fileInput");
+
+      btn.addEventListener("click", async () => {
+        if (!fileInput.files.length) {
+          alert("Please select a file first!");
+          return;
+        }
+
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          const response = await fetch("/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error("Upload failed");
+
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "translations_key.xlsx";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+        } catch (err) {
+          alert("Error: " + err.message);
+        }
+      });
+    </script>
+  </body>
+</html>
