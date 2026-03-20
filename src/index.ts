@@ -4,20 +4,23 @@ import multer from "multer";
 import ExcelJS from "exceljs";
 import path from "path";
 import archiver from "archiver";
-import { PassThrough } from "stream";
+import { Writable } from "stream";
+import dotenv from "dotenv";
+import { put } from "@vercel/blob";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
 import parseExcelToObject from "./utils/parseExcelToObject.js";
 import generateExcelBuffer from "./utils/generateExcelBuffer.js";
-import generateExcelStream from "./utils/generateExcelStream.js";
-import generateDuplicateExcelStream from "./utils/generateDuplicateExcelStream.js";
+import generateDuplicateExcel from "./utils/generateDuplicateExcel.js";
 
 const app = express();
 const PORT = 3000;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+dotenv.config();
 
 app.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
@@ -30,20 +33,22 @@ app.post("/upload", upload.single("file"), async (req: Request, res: Response) =
 
     const data: Record<string, string> = eval(fixedContent);
 
-    const buffer = await generateExcelBuffer(data);
+    const excelBuffer = await generateExcelBuffer(data);
 
-    res.setHeader(
-      "Content-Disposition",
-      'attachment; filename="translations_key.xlsx"'
+    const blob = await put(
+      `translations-key-${Date.now()}.xlsx`,
+      excelBuffer,
+      {
+        access: "public",
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        allowOverwrite: true
+      }
     );
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.send(buffer);
+
+    return res.json({
+      url: blob.url,
+    });
   } catch (err) {
-    console.log('check err', err);
-
     console.error(err);
     res.status(500).send("Error processing file");
   }
@@ -68,7 +73,6 @@ app.post(
 
       const result: Record<string, string> = {};
 
-      // Bỏ qua header (row 1)
       sheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return;
 
@@ -198,42 +202,53 @@ app.post(
       };
 
       const jsContent = generateJsFile(merged);
-      const excelStream = await generateExcelStream(merged);
+      const excelBuffer = await generateExcelBuffer(merged);
 
-      const duplicateExcelStream = await generateDuplicateExcelStream(
+      const duplicateExcelBuffer = await generateDuplicateExcel(
         data1,
         data2,
         duplicatedKeys
       );
 
-      res.setHeader(
-        "Content-Disposition",
-        'attachment; filename="merged_result.zip"'
-      );
-      res.setHeader("Content-Type", "application/zip");
+      const chunks: Buffer[] = [];
+      const writable = new Writable({
+        write(chunk, _, cb) {
+          chunks.push(chunk);
+          cb();
+        },
+      });
 
       const archive = archiver("zip", {
         zlib: { level: 9 },
       });
 
-      const stream = new PassThrough();
-      archive.pipe(stream);
-
-      archive.pipe(res);
+      archive.pipe(writable);
 
       archive.append(jsContent, { name: "en.js" });
-      archive.append(excelStream as any, { name: "merged_keys.xlsx" });
+      archive.append(excelBuffer as any, { name: "merged_keys.xlsx" });
 
       if (duplicatedKeys.length > 0) {
-        archive.append(duplicateExcelStream as any, {
+        archive.append(duplicateExcelBuffer as any, {
           name: "duplicated_keys.xlsx",
         });
       }
 
-      await new Promise<void>((resolve, reject) => {
-        archive.on("error", reject);
-        stream.on("close", resolve);
-        archive.finalize();
+      await archive.finalize();
+
+      const zipBuffer = Buffer.concat(chunks);
+
+      const blob = await put(
+        `merged-keys-${Date.now()}.zip`,
+        zipBuffer,
+        {
+          access: "public",
+          token: process.env.BLOB_READ_WRITE_TOKEN,
+          allowOverwrite: true
+        }
+      );
+
+      return res.json({
+        url: blob.url,
       });
     } catch (err) {
       console.error(err);

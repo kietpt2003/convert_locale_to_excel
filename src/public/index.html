@@ -87,6 +87,22 @@
       .tab-content.active {
         display: block;
       }
+
+      .spinner {
+        margin: 10px auto;
+        width: 30px;
+        height: 30px;
+        border: 4px solid #ccc;
+        border-top: 4px solid #4caf50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
     </style>
   </head>
 
@@ -131,8 +147,18 @@
           <input type="file" name="file" accept=".js" required />
         </div>
 
-        <button type="submit">Convert</button>
+        <button id="button-dev" type="submit">Convert</button>
       </form>
+
+      <div id="loading-dev" style="margin-top: 15px; display: none">
+        <div class="spinner"></div>
+        <div>Processing...</div>
+      </div>
+
+      <div id="result-dev" style="margin-top: 20px; display: none">
+        <p><strong>Download Link:</strong></p>
+        <a id="download-link-dev" href="#" target="_blank"></a>
+      </div>
     </div>
 
     <div class="tab-content">
@@ -180,8 +206,18 @@
           />
         </div>
 
-        <button type="submit">Merge</button>
+        <button id="button-cs" type="submit">Merge</button>
       </form>
+
+      <div id="loading-cs" style="margin-top: 15px; display: none">
+        <div class="spinner"></div>
+        <div>Processing...</div>
+      </div>
+
+      <div id="result-cs" style="margin-top: 20px; display: none">
+        <p><strong>Download Link:</strong></p>
+        <a id="download-link-cs" href="#" target="_blank"></a>
+      </div>
     </div>
 
     <script>
@@ -212,13 +248,41 @@
 
           const formData = new FormData(e.target);
 
-          const res = await fetch("/upload", {
-            method: "POST",
-            body: formData,
-          });
+          const resultDiv = document.getElementById("result-dev");
+          const link = document.getElementById("download-link-dev");
+          const loading = document.getElementById("loading-dev");
+          const button = document.getElementById("button-dev");
 
-          const blob = await res.blob();
-          downloadFile(blob, "translations_key.xlsx");
+          link.href = "";
+          link.textContent = "";
+          resultDiv.style.display = "none";
+
+          loading.style.display = "block";
+          button.disabled = true;
+          button.textContent = "Processing...";
+
+          try {
+            const res = await fetch("/upload", {
+              method: "POST",
+              body: formData,
+            });
+
+            const data = await res.json();
+
+            requestAnimationFrame(() => {
+              link.href = data.url;
+              link.textContent = data.url;
+
+              resultDiv.style.display = "block";
+            });
+          } catch (err) {
+            alert("Something went wrong!");
+            console.error(err);
+          } finally {
+            loading.style.display = "none";
+            button.disabled = false;
+            button.textContent = "Convert";
+          }
         });
 
       // TAB CS
@@ -226,15 +290,44 @@
         .getElementById("form-cs")
         .addEventListener("submit", async (e) => {
           e.preventDefault();
+
           const formData = new FormData(e.target);
 
-          const res = await fetch("/upload-excel-merge-zip", {
-            method: "POST",
-            body: formData,
-          });
+          const resultDiv = document.getElementById("result-cs");
+          const link = document.getElementById("download-link-cs");
+          const loading = document.getElementById("loading-cs");
+          const button = document.getElementById("button-cs");
 
-          const blob = await res.blob();
-          downloadFile(blob, "merged_keys_result.zip");
+          link.href = "";
+          link.textContent = "";
+          resultDiv.style.display = "none";
+
+          loading.style.display = "block";
+          button.disabled = true;
+          button.textContent = "Processing...";
+
+          try {
+            const res = await fetch("/upload-excel-merge-zip", {
+              method: "POST",
+              body: formData,
+            });
+
+            const data = await res.json();
+
+            requestAnimationFrame(() => {
+              link.href = data.url;
+              link.textContent = data.url;
+
+              resultDiv.style.display = "block";
+            });
+          } catch (err) {
+            alert("Something went wrong!");
+            console.error(err);
+          } finally {
+            loading.style.display = "none";
+            button.disabled = false;
+            button.textContent = "Merge";
+          }
         });
     </script>
   </body>
