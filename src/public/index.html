@@ -220,8 +220,10 @@
       </div>
     </div>
 
-    <script>
-      function switchTab(index) {
+    <script type="module">
+      import { put } from "https://esm.sh/@vercel/blob";
+
+      window.switchTab = function (index) {
         const tabs = document.querySelectorAll(".tab");
         const contents = document.querySelectorAll(".tab-content");
 
@@ -229,15 +231,30 @@
           t.classList.toggle("active", i === index);
           contents[i].classList.toggle("active", i === index);
         });
-      }
+      };
 
-      function downloadFile(blob, filename) {
+      window.downloadFile = function (blob, filename) {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
         a.download = filename;
         a.click();
         window.URL.revokeObjectURL(url);
+      };
+
+      async function uploadFile(file, token) {
+        const ext = file.name.split(".").pop();
+        const nameWithoutExt = file.name.substring(
+          0,
+          file.name.lastIndexOf("."),
+        );
+        const newName = `${nameWithoutExt}_${Date.now()}.${ext}`;
+
+        const blob = await put(newName, file, {
+          access: "public",
+          token: token,
+        });
+        return blob.url;
       }
 
       // TAB DEV
@@ -246,6 +263,9 @@
         .addEventListener("submit", async (e) => {
           e.preventDefault();
 
+          const form = e.target;
+
+          const file = form.querySelector('input[name="file"]').files[0];
           const formData = new FormData(e.target);
 
           const resultDiv = document.getElementById("result-dev");
@@ -259,12 +279,31 @@
 
           loading.style.display = "block";
           button.disabled = true;
-          button.textContent = "Processing...";
+          button.textContent = "Uploading...";
 
           try {
+            const resToken = await fetch("/blob-token", {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            });
+            const dataToken = await resToken.json();
+
+            const [url] = await Promise.all([
+              uploadFile(file, dataToken.token),
+            ]);
+
+            button.textContent = "Processing...";
+
             const res = await fetch("/upload", {
               method: "POST",
-              body: formData,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                fileUrl: url,
+              }),
             });
 
             const data = await res.json();
@@ -291,7 +330,15 @@
         .addEventListener("submit", async (e) => {
           e.preventDefault();
 
-          const formData = new FormData(e.target);
+          const form = e.target;
+
+          const file1 = form.querySelector('input[name="file1"]').files[0];
+          const file2 = form.querySelector('input[name="file2"]').files[0];
+
+          const keyColumnFile1 = form.keyColumnFile1.value || 1;
+          const valueColumnFile1 = form.valueColumnFile1.value || 2;
+          const keyColumnFile2 = form.keyColumnFile2.value || 1;
+          const valueColumnFile2 = form.valueColumnFile2.value || 2;
 
           const resultDiv = document.getElementById("result-cs");
           const link = document.getElementById("download-link-cs");
@@ -304,12 +351,37 @@
 
           loading.style.display = "block";
           button.disabled = true;
-          button.textContent = "Processing...";
+          button.textContent = "Uploading...";
 
           try {
+            const resToken = await fetch("/blob-token", {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+            });
+            const dataToken = await resToken.json();
+
+            const [url1, url2] = await Promise.all([
+              uploadFile(file1, dataToken.token),
+              uploadFile(file2, dataToken.token),
+            ]);
+
+            button.textContent = "Processing...";
+
             const res = await fetch("/upload-excel-merge-zip", {
               method: "POST",
-              body: formData,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                file1Url: url1,
+                file2Url: url2,
+                keyColumnFile1,
+                valueColumnFile1,
+                keyColumnFile2,
+                valueColumnFile2,
+              }),
             });
 
             const data = await res.json();
@@ -317,7 +389,6 @@
             requestAnimationFrame(() => {
               link.href = data.url;
               link.textContent = data.url;
-
               resultDiv.style.display = "block";
             });
           } catch (err) {

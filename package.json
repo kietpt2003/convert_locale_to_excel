@@ -1,6 +1,6 @@
 {
   "name": "convert_locale_key_to_excel",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "type": "module",
   "scripts": {
     "dev": "nodemon --watch src --exec tsx src/index.ts"
@@ -8,6 +8,7 @@
   "dependencies": {
     "@vercel/blob": "^2.3.1",
     "archiver": "^7.0.1",
+    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
@@ -15,6 +16,7 @@
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/multer": "^2.1.0",
     "@types/node": "^25.5.0",
