@@ -10,7 +10,8 @@ import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
 import parseExcelToObject from "./utils/parseExcelToObject.js";
 import generateExcelBuffer from "./utils/generateExcelBuffer.js";
-import generateDuplicateExcel from "./utils/generateDuplicateExcel.js";
+import generateExcelStream from "./utils/generateExcelStream.js";
+import generateDuplicateExcelStream from "./utils/generateDuplicateExcelStream.js";
 
 const app = express();
 const PORT = 3000;
@@ -197,9 +198,9 @@ app.post(
       };
 
       const jsContent = generateJsFile(merged);
-      const excelBuffer = await generateExcelBuffer(merged);
+      const excelStream = await generateExcelStream(merged);
 
-      const duplicateExcelBuffer = await generateDuplicateExcel(
+      const duplicateExcelStream = await generateDuplicateExcelStream(
         data1,
         data2,
         duplicatedKeys
@@ -221,10 +222,10 @@ app.post(
       archive.pipe(res);
 
       archive.append(jsContent, { name: "en.js" });
-      archive.append(excelBuffer as any, { name: "merged_keys.xlsx" });
+      archive.append(excelStream as any, { name: "merged_keys.xlsx" });
 
       if (duplicatedKeys.length > 0) {
-        archive.append(duplicateExcelBuffer as any, {
+        archive.append(duplicateExcelStream as any, {
           name: "duplicated_keys.xlsx",
         });
       }
