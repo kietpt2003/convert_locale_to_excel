@@ -2,30 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Upload Key File to Excel</title>
+    <title>Key Generator Tool</title>
+
     <style>
       body {
         font-family: Arial, sans-serif;
-        padding: 40px;
-        background-color: #f4f4f9;
-        color: #333;
-      }
-
-      h1 {
+        padding: 20px;
         text-align: center;
-        color: #222;
-        margin-bottom: 30px;
-      }
-
-      .container {
-        max-width: 400px;
-        margin: 0 auto;
-        padding: 30px 20px;
-        background-color: #fff;
-        box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
-        border-radius: 10px;
-        text-align: center;
-        position: relative;
       }
 
       .avatar-wrapper {
@@ -41,150 +24,218 @@
         border: 3px solid #4caf50;
       }
 
-      /* Dấu tick xanh */
       .verified-badge {
         position: absolute;
         bottom: 5px;
         right: 5px;
-        width: 28px;
-        height: 28px;
-        background-color: #4caf50;
+        width: 20px;
+        height: 20px;
+        background: #4caf50;
         border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         border: 2px solid white;
       }
 
-      .verified-badge::after {
-        content: "✓";
-        color: white;
-        font-weight: bold;
-        font-size: 16px;
-      }
-
       .developer-name {
+        margin-top: 10px;
         font-weight: bold;
-        font-size: 22px;
-        margin-top: 15px;
-        margin-bottom: 10px;
-        word-wrap: break-word; /* tên dài sẽ xuống dòng */
-      }
-
-      .developer-links {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-bottom: 20px;
-      }
-
-      .developer-links a {
-        flex: 1;
-        display: block;
       }
 
       .developer-links img {
-        width: 120px; /* nhỏ hơn trước */
-        height: 32px; /* đồng bộ chiều cao */
-        object-fit: cover;
-        border-radius: 5px;
+        margin: 5px;
       }
 
-      .upload-section {
-        margin-top: 20px;
+      .form-group {
+        margin-bottom: 12px;
       }
 
-      input[type="file"] {
-        margin-bottom: 10px;
+      input {
+        padding: 6px;
+        width: 250px;
       }
 
       button {
-        padding: 10px 20px;
-        font-size: 16px;
+        padding: 8px 16px;
         cursor: pointer;
-        background-color: #4caf50;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        transition: background-color 0.2s;
       }
 
-      button:hover {
-        background-color: #45a049;
+      .tabs {
+        display: flex;
+        justify-content: center;
+        margin-top: 30px;
+        cursor: pointer;
+      }
+
+      .tab {
+        padding: 10px 20px;
+        border: 1px solid #ccc;
+        border-bottom: none;
+        background: #f5f5f5;
+      }
+
+      .tab.active {
+        background: white;
+        font-weight: bold;
+      }
+
+      .tab-content {
+        border: 1px solid #ccc;
+        padding: 20px;
+        display: none;
+        margin-top: -1px;
+      }
+
+      .tab-content.active {
+        display: block;
       }
     </style>
   </head>
+
   <body>
-    <h1>Upload Key File & Download Excel</h1>
-    <div class="container">
-      <div class="avatar-wrapper">
+    <div class="avatar-wrapper">
+      <img
+        class="developer-avatar"
+        src="assets/avatar.JPG"
+        alt="Developer Avatar"
+      />
+      <div class="verified-badge"></div>
+    </div>
+
+    <div class="developer-name">
+      Phạm Tuấn Kiệt – Fullstack Developer & React Native Specialist
+    </div>
+
+    <div class="developer-links">
+      <a href="https://www.facebook.com/tuankiet29012003" target="_blank">
         <img
-          class="developer-avatar"
-          src="assets/avatar.JPG"
-          alt="Developer Avatar"
+          src="https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white"
         />
-        <div class="verified-badge"></div>
-      </div>
+      </a>
+      <a href="https://www.linkedin.com/in/kietpt2003" target="_blank">
+        <img
+          src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white"
+        />
+      </a>
+    </div>
 
-      <div class="developer-name">
-        Phạm Tuấn Kiệt – Fullstack Developer & React Native Specialist
-      </div>
+    <h2>Key Generator Tool</h2>
 
-      <div class="developer-links">
-        <a href="https://www.facebook.com/tuankiet29012003" target="_blank">
-          <img
-            src="https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white"
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0)">For Dev</div>
+      <div class="tab" onclick="switchTab(1)">For CS</div>
+    </div>
+
+    <div class="tab-content active">
+      <h3>JS → Excel</h3>
+      <form id="form-dev">
+        <div class="form-group">
+          <input type="file" name="file" accept=".js" required />
+        </div>
+
+        <button type="submit">Convert</button>
+      </form>
+    </div>
+
+    <div class="tab-content">
+      <h3>Key generator (2 files)</h3>
+      <form id="form-cs">
+        <div class="form-group">
+          <input type="file" name="file1" required />
+        </div>
+
+        <div class="form-group">
+          <input
+            type="text"
+            name="keyColumnFile1"
+            placeholder="Key Column File 1"
           />
-        </a>
-        <a href="https://www.linkedin.com/in/kietpt2003" target="_blank">
-          <img
-            src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white"
-          />
-        </a>
-      </div>
+        </div>
 
-      <div class="upload-section">
-        <input type="file" id="fileInput" />
-        <br />
-        <button id="uploadBtn">Upload & Download</button>
-      </div>
+        <div class="form-group">
+          <input
+            type="text"
+            name="valueColumnFile1"
+            placeholder="Value Column File 1"
+          />
+        </div>
+
+        <hr />
+
+        <div class="form-group">
+          <input type="file" name="file2" required />
+        </div>
+
+        <div class="form-group">
+          <input
+            type="text"
+            name="keyColumnFile2"
+            placeholder="Key Column File 2"
+          />
+        </div>
+
+        <div class="form-group">
+          <input
+            type="text"
+            name="valueColumnFile2"
+            placeholder="Value Column File 2"
+          />
+        </div>
+
+        <button type="submit">Merge</button>
+      </form>
     </div>
 
     <script>
-      const btn = document.getElementById("uploadBtn");
-      const fileInput = document.getElementById("fileInput");
+      function switchTab(index) {
+        const tabs = document.querySelectorAll(".tab");
+        const contents = document.querySelectorAll(".tab-content");
 
-      btn.addEventListener("click", async () => {
-        if (!fileInput.files.length) {
-          alert("Please select a file first!");
-          return;
-        }
+        tabs.forEach((t, i) => {
+          t.classList.toggle("active", i === index);
+          contents[i].classList.toggle("active", i === index);
+        });
+      }
 
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append("file", file);
+      function downloadFile(blob, filename) {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      }
 
-        try {
-          const response = await fetch("/upload", {
+      // TAB DEV
+      document
+        .getElementById("form-dev")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const formData = new FormData(e.target);
+
+          const res = await fetch("/upload", {
             method: "POST",
             body: formData,
           });
 
-          if (!response.ok) throw new Error("Upload failed");
+          const blob = await res.blob();
+          downloadFile(blob, "translations_key.xlsx");
+        });
 
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = "translations_key.xlsx";
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-        } catch (err) {
-          alert("Error: " + err.message);
-        }
-      });
+      // TAB CS
+      document
+        .getElementById("form-cs")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const formData = new FormData(e.target);
+
+          const res = await fetch("/upload-excel-merge-zip", {
+            method: "POST",
+            body: formData,
+          });
+
+          const blob = await res.blob();
+          downloadFile(blob, "merged_keys_result.zip");
+        });
     </script>
   </body>
 </html>
