@@ -7,7 +7,6 @@ import archiver from "archiver";
 import { Writable } from "stream";
 import dotenv from "dotenv";
 import { put } from "@vercel/blob";
-import fs from "fs";
 import cors from "cors";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
@@ -15,6 +14,8 @@ import generateJsFile from "./utils/generateJsFile.js";
 import parseExcelToObject from "./utils/parseExcelToObject.js";
 import generateExcelBuffer from "./utils/generateExcelBuffer.js";
 import generateDuplicateExcel from "./utils/generateDuplicateExcel.js";
+
+const uniqueIPs = new Set<string>();
 
 const app = express();
 const PORT = 3000;
@@ -26,6 +27,26 @@ dotenv.config();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use((req, res, next) => {
+  const ip =
+    req.headers["x-forwarded-for"]?.toString().split(",")[0] ||
+    req.socket.remoteAddress ||
+    "";
+
+  if (ip) {
+    uniqueIPs.add(ip);
+  }
+
+  console.log("Unique visits:", uniqueIPs.size);
+  next();
+});
+
+app.get("/visits", (req, res) => {
+  res.json({
+    totalUnique: uniqueIPs.size,
+  });
+});
 
 app.get("/blob-token", async (_req: Request, res: Response) => {
   try {
@@ -40,7 +61,7 @@ app.get("/blob-token", async (_req: Request, res: Response) => {
   }
 });
 
-app.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
+app.post("/upload", async (req: Request, res: Response) => {
   try {
     const {
       fileUrl,
@@ -48,9 +69,7 @@ app.post("/upload", upload.single("file"), async (req: Request, res: Response) =
 
     if (!fileUrl) return res.status(400).send("No file uploaded");
 
-    const [fileRes] = await Promise.all([
-      fetch(fileUrl),
-    ]);
+    const fileRes = await fetch(fileUrl);
 
     if (!fileRes.ok) {
       return res.status(400).json({ message: "Cannot fetch files from URL" });
@@ -86,18 +105,27 @@ app.post("/upload", upload.single("file"), async (req: Request, res: Response) =
 
 app.post(
   "/upload-excel",
-  upload.single("file"),
   async (req: Request, res: Response) => {
     try {
-      if (!req.file) {
-        return res.status(400).send("No file uploaded");
+      const {
+        fileUrl,
+      } = req.body;
+
+      if (!fileUrl) return res.status(400).send("No file uploaded");
+
+      const fileRes = await fetch(fileUrl);
+
+      if (!fileRes.ok) {
+        return res.status(400).json({ message: "Cannot fetch files from URL" });
       }
+
+      const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
 
       const keyColumn = Number(req.body.keyColumn) || 1;
       const valueColumn = Number(req.body.valueColumn) || 2;
 
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(req.file.buffer as any);
+      await workbook.xlsx.load(fileBuffer as any);
 
       const sheet = workbook.worksheets[0];
 
@@ -114,16 +142,18 @@ app.post(
         }
       });
 
-      // Convert object -> JS string
       const jsContent = generateJsFile(result);
+      const jsBuffer = Buffer.from(jsContent, "utf-8");
 
-      res.setHeader(
-        "Content-Disposition",
-        'attachment; filename="en.js"'
-      );
-      res.setHeader("Content-Type", "application/javascript");
+      const blob = await put("en.js", jsBuffer, {
+        access: "public",
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        allowOverwrite: true
+      });
 
-      res.send(jsContent);
+      return res.json({
+        url: blob.url,
+      });
     } catch (err) {
       console.error(err);
       res.status(500).send("Error processing Excel file");

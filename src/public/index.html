@@ -103,6 +103,33 @@
           transform: rotate(360deg);
         }
       }
+
+      .dev-mode-buttons {
+        margin-bottom: 15px;
+      }
+
+      .dev-mode-buttons button {
+        padding: 8px 16px;
+        margin: 0 5px;
+        border: 1px solid #ccc;
+        background: #f5f5f5;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .dev-mode-buttons button.active {
+        background: #4caf50;
+        color: white;
+        border-color: #4caf50;
+      }
+
+      .dev-mode-buttons button:hover {
+        opacity: 0.8;
+      }
+
+      #visit-count {
+        transition: transform 0.3s ease;
+      }
     </style>
   </head>
 
@@ -135,19 +162,64 @@
 
     <h2>Key Generator Tool</h2>
 
+    <div style="margin: 20px 0">
+      <h3>👀 Total Visitors</h3>
+      <div id="visit-count" style="font-size: 32px; font-weight: bold">0</div>
+    </div>
+
     <div class="tabs">
       <div class="tab active" onclick="switchTab(0)">For Dev</div>
       <div class="tab" onclick="switchTab(1)">For CS</div>
     </div>
 
     <div class="tab-content active">
-      <h3>JS → Excel</h3>
-      <form id="form-dev">
+      <h3>Dev Tools</h3>
+
+      <div class="dev-mode-buttons">
+        <button
+          id="btn-js"
+          class="active"
+          onclick="switchDevMode('js-to-excel')"
+        >
+          JS → Excel
+        </button>
+        <button id="btn-excel" onclick="switchDevMode('excel-to-js')">
+          Excel → JS
+        </button>
+      </div>
+
+      <!-- JS → Excel -->
+      <form id="form-dev-js">
         <div class="form-group">
           <input type="file" name="file" accept=".js" required />
         </div>
 
-        <button id="button-dev" type="submit">Convert</button>
+        <button id="button-dev-js" type="submit">Convert JS → Excel</button>
+      </form>
+
+      <!-- Excel → JS -->
+      <form id="form-dev-excel" style="display: none">
+        <div class="form-group">
+          <input type="file" name="file" accept=".xlsx" required />
+        </div>
+
+        <div class="form-group">
+          <input
+            type="text"
+            name="keyColumn"
+            placeholder="Key Column (default 1)"
+          />
+        </div>
+
+        <div class="form-group">
+          <input
+            type="text"
+            name="valueColumn"
+            placeholder="Value Column (default 2)"
+          />
+        </div>
+
+        <button id="button-dev-excel" type="submit">Convert Excel → JS</button>
       </form>
 
       <div id="loading-dev" style="margin-top: 15px; display: none">
@@ -242,6 +314,72 @@
         window.URL.revokeObjectURL(url);
       };
 
+      window.switchDevMode = function (mode) {
+        const resultDiv = document.getElementById("result-dev");
+        const link = document.getElementById("download-link-dev");
+
+        link.href = "";
+        link.textContent = "";
+        resultDiv.style.display = "none";
+
+        const formJs = document.getElementById("form-dev-js");
+        const formExcel = document.getElementById("form-dev-excel");
+
+        const btnJs = document.getElementById("btn-js");
+        const btnExcel = document.getElementById("btn-excel");
+
+        if (mode === "js-to-excel") {
+          formJs.style.display = "block";
+          formExcel.style.display = "none";
+
+          btnJs.classList.add("active");
+          btnExcel.classList.remove("active");
+        } else {
+          formJs.style.display = "none";
+          formExcel.style.display = "block";
+
+          btnJs.classList.remove("active");
+          btnExcel.classList.add("active");
+        }
+      };
+
+      function animateCount(element, to) {
+        element.style.transform = "scale(1.2)";
+
+        const duration = 1000;
+        const startTime = performance.now();
+
+        function update(currentTime) {
+          const progress = Math.min((currentTime - startTime) / duration, 1);
+          const value = Math.floor(progress * to);
+
+          element.textContent = value;
+
+          if (progress < 1) {
+            requestAnimationFrame(update);
+          } else {
+            element.style.transform = "scale(1)";
+          }
+        }
+
+        requestAnimationFrame(update);
+      }
+
+      async function loadVisits() {
+        try {
+          const res = await fetch("/visits");
+          const data = await res.json();
+
+          const el = document.getElementById("visit-count");
+
+          animateCount(el, data.totalUnique);
+        } catch (err) {
+          console.error("Failed to load visits", err);
+        }
+      }
+
+      loadVisits();
+
       async function uploadFile(file, token) {
         const ext = file.name.split(".").pop();
         const nameWithoutExt = file.name.substring(
@@ -259,19 +397,18 @@
 
       // TAB DEV
       document
-        .getElementById("form-dev")
+        .getElementById("form-dev-js")
         .addEventListener("submit", async (e) => {
           e.preventDefault();
 
           const form = e.target;
 
           const file = form.querySelector('input[name="file"]').files[0];
-          const formData = new FormData(e.target);
 
           const resultDiv = document.getElementById("result-dev");
           const link = document.getElementById("download-link-dev");
           const loading = document.getElementById("loading-dev");
-          const button = document.getElementById("button-dev");
+          const button = document.getElementById("button-dev-js");
 
           link.href = "";
           link.textContent = "";
@@ -290,9 +427,7 @@
             });
             const dataToken = await resToken.json();
 
-            const [url] = await Promise.all([
-              uploadFile(file, dataToken.token),
-            ]);
+            const url = await uploadFile(file, dataToken.token);
 
             button.textContent = "Processing...";
 
@@ -321,6 +456,67 @@
             loading.style.display = "none";
             button.disabled = false;
             button.textContent = "Convert";
+          }
+        });
+
+      document
+        .getElementById("form-dev-excel")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const form = e.target;
+
+          const file = form.querySelector('input[name="file"]').files[0];
+          const keyColumn = form.keyColumn.value || 1;
+          const valueColumn = form.valueColumn.value || 2;
+
+          const resultDiv = document.getElementById("result-dev");
+          const link = document.getElementById("download-link-dev");
+          const loading = document.getElementById("loading-dev");
+          const button = document.getElementById("button-dev-excel");
+
+          link.href = "";
+          link.textContent = "";
+          resultDiv.style.display = "none";
+
+          loading.style.display = "block";
+          button.disabled = true;
+          button.textContent = "Uploading...";
+
+          try {
+            const resToken = await fetch("/blob-token");
+            const dataToken = await resToken.json();
+
+            const url = await uploadFile(file, dataToken.token);
+
+            button.textContent = "Processing...";
+
+            const res = await fetch("/upload-excel", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                fileUrl: url,
+                keyColumn,
+                valueColumn,
+              }),
+            });
+
+            const data = await res.json();
+
+            requestAnimationFrame(() => {
+              link.href = data.url;
+              link.textContent = data.url;
+              resultDiv.style.display = "block";
+            });
+          } catch (err) {
+            alert("Something went wrong!");
+            console.error(err);
+          } finally {
+            loading.style.display = "none";
+            button.disabled = false;
+            button.textContent = "Convert Excel → JS";
           }
         });
 
