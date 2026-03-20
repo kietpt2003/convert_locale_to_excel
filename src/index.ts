@@ -4,6 +4,7 @@ import multer from "multer";
 import ExcelJS from "exceljs";
 import path from "path";
 import archiver from "archiver";
+import { PassThrough } from "stream";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -214,6 +215,9 @@ app.post(
         zlib: { level: 9 },
       });
 
+      const stream = new PassThrough();
+      archive.pipe(stream);
+
       archive.pipe(res);
 
       archive.append(jsContent, { name: "en.js" });
@@ -225,7 +229,11 @@ app.post(
         });
       }
 
-      await archive.finalize();
+      await new Promise<void>((resolve, reject) => {
+        archive.on("error", reject);
+        stream.on("close", resolve);
+        archive.finalize();
+      });
     } catch (err) {
       console.error(err);
       res.status(500).send("Error merging Excel files");
