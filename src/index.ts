@@ -414,6 +414,120 @@ app.get("/api-usage/total", async (req, res) => {
   }
 });
 
+app.post("/generate-excels-for-each-locales", async (req: Request, res: Response) => {
+  try {
+    const {
+      fileUrl,
+      workSheetKey = 1,
+      keyColumn = 1,
+      workSheetValue = 1,
+      valueColumns = [],
+    } = req.body;
+
+    console.log('check', req.body);
+    
+
+    if (!fileUrl) {
+      return res.status(400).json({ message: "Missing file URLs" });
+    }
+
+    const fileRes = await fetch(fileUrl);
+
+    if (!fileRes.ok) {
+      return res.status(400).json({ message: "Cannot fetch files from URL" });
+    }
+
+    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+
+    if (!Array.isArray(valueColumns) || valueColumns.length === 0) {
+      return res.status(400).json({ message: "No valueColumns provided" });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(fileBuffer as any);
+
+    const keySheet = workbook.worksheets[workSheetKey - 1];
+    const valueSheet = workbook.worksheets[workSheetValue - 1];
+
+    if (!keySheet || !valueSheet) {
+      return res.status(400).json({ message: "Worksheet not found" });
+    }
+
+    const headerRow = valueSheet.getRow(1);
+
+    const results: Record<string, Record<string, string>> = {};
+
+    valueColumns.forEach((colIndex: number) => {
+      const header =
+        headerRow.getCell(colIndex).text?.trim() || `col_${colIndex}`;
+
+      results[header] = {};
+    });
+
+    keySheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const key = row.getCell(keyColumn).text?.trim();
+      if (!key) return;
+
+      valueColumns.forEach((colIndex: number) => {
+        const header =
+          headerRow.getCell(colIndex).text?.trim() || `col_${colIndex}`;
+
+        const value =
+          valueSheet.getRow(rowNumber).getCell(colIndex).text?.trim() || "";
+
+        results[header][key] = value;
+      });
+    });
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    const chunks: Buffer[] = [];
+    const writable = new Writable({
+      write(chunk, _, cb) {
+        chunks.push(chunk);
+        cb();
+      },
+    });
+
+    archive.pipe(writable);
+
+    for (const locale of Object.keys(results)) {
+      const data = results[locale];
+
+      const excelBuffer = await generateExcelBuffer(data);
+
+      archive.append(excelBuffer as any, {
+        name: `${locale}.xlsx`,
+      });
+    }
+
+    await archive.finalize();
+
+    const zipBuffer = Buffer.concat(chunks);
+
+    const blob = await put(
+      `locales_${Date.now()}.zip`,
+      zipBuffer,
+      {
+        access: "public",
+        token: process.env.BLOB_READ_WRITE_TOKEN,
+        allowOverwrite: true,
+      }
+    );
+
+    return res.json({
+      url: blob.url,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Error processing files",
+    });
+  }
+});
+
 app.use(express.static(path.resolve('src/public')));
 
 app.listen(PORT, () => {

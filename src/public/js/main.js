@@ -1,5 +1,5 @@
 // ================= TAB =================
-export function switchTab(index) {
+function switchTab(index) {
   const tabs = document.querySelectorAll(".tab");
   const contents = document.querySelectorAll(".tab-content");
 
@@ -10,7 +10,7 @@ export function switchTab(index) {
 }
 
 // ================= DEV MODE =================
-export function switchDevMode(mode) {
+function switchDevMode(mode) {
   const resultDiv = document.getElementById("result-dev");
   const link = document.getElementById("download-link-dev");
 
@@ -38,6 +38,16 @@ export function switchDevMode(mode) {
     btnExcel.classList.add("active");
   }
 }
+
+function switchCsTab(index) {
+  const tabs = document.querySelectorAll(".cs-tab");
+  const contents = document.querySelectorAll(".cs-tab-content");
+
+  tabs.forEach((t, i) => {
+    t.classList.toggle("active", i === index);
+    contents[i].classList.toggle("active", i === index);
+  });
+};
 
 // ================= ANIMATION =================
 export function animateCount(element, to) {
@@ -298,6 +308,122 @@ function tabCS() {
         button.textContent = "Merge";
       }
     });
+
+  document
+    .getElementById("form-cs-locales")
+    .addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const form = e.target;
+
+      const file = form.querySelector('input[name="file"]').files[0];
+
+      const workSheetKey = form.workSheetKey.value || 1;
+      const keyColumn = form.keyColumn.value || 1;
+      const workSheetValue = form.workSheetValue.value || 1;
+
+      const rawValueColumns = form.valueColumns.value;
+
+      const resultDiv = document.getElementById("result-cs-locales");
+      const link = document.getElementById("download-link-cs-locales");
+      const loading = document.getElementById("loading-cs-locales");
+      const button = document.getElementById("button-cs-locales");
+
+      if (!file) {
+        alert("Please select a file");
+        return;
+      }
+
+      const isValidNumber = (val) => {
+        return !isNaN(val) && Number(val) > 0;
+      };
+
+      if (!isValidNumber(workSheetKey)) {
+        alert("Worksheet Key must be a number > 0");
+        return;
+      }
+
+      if (!isValidNumber(keyColumn)) {
+        alert("Key Column must be a number > 0");
+        return;
+      }
+
+      if (!isValidNumber(workSheetValue)) {
+        alert("Worksheet Value must be a number > 0");
+        return;
+      }
+
+      const valueColumns = rawValueColumns
+        .split(",")
+        .map((v) => v.trim());
+
+      if (valueColumns.length === 0) {
+        alert("Value Columns is required");
+        return;
+      }
+
+      const invalidColumns = valueColumns.filter(
+        (v) => isNaN(v) || Number(v) <= 0
+      );
+
+      if (invalidColumns.length > 0) {
+        alert(
+          `Invalid valueColumns: ${invalidColumns.join(", ")}. Must be numbers > 0`
+        );
+        return;
+      }
+
+      // convert to number array AFTER validate
+      const parsedValueColumns = valueColumns.map(Number);
+
+      link.href = "";
+      link.textContent = "";
+      resultDiv.style.display = "none";
+
+      loading.style.display = "block";
+      button.disabled = true;
+      button.textContent = "Uploading...";
+
+      try {
+        const resToken = await fetch("/blob-token");
+        const dataToken = await resToken.json();
+
+        const fileUrl = await uploadFile(file, dataToken.token);
+
+        button.textContent = "Processing...";
+
+        const res = await fetch("/generate-excels-for-each-locales", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileUrl,
+            workSheetKey: Number(workSheetKey),
+            keyColumn: Number(keyColumn),
+            workSheetValue: Number(workSheetValue),
+            valueColumns: parsedValueColumns,
+          }),
+        });
+
+        const data = await res.json();
+
+        requestAnimationFrame(() => {
+          link.href = data.url;
+          link.textContent = data.url;
+          resultDiv.style.display = "block";
+        });
+
+        loadStats();
+      } catch (err) {
+        alert("Something went wrong!");
+        console.error(err);
+      } finally {
+        loading.style.display = "none";
+        button.disabled = false;
+        button.textContent = "Generate ZIP";
+      }
+    });
 }
 
 export async function loadStats() {
@@ -307,6 +433,7 @@ export async function loadStats() {
       { key: "upload-count", endpoint: "/upload" },
       { key: "upload-excel-count", endpoint: "/upload-excel" },
       { key: "merge-count", endpoint: "/upload-excel-merge-zip" },
+      { key: "generate-locales", endpoint: "/generate-excels-for-each-locales"}
     ];
 
     for (const item of endpoints) {
@@ -328,6 +455,8 @@ export function init() {
 
   window.switchTab = switchTab;
   window.switchDevMode = switchDevMode;
+
+  window.switchCsTab = switchCsTab;
 
   tabDev();
 

@@ -5,97 +5,191 @@
     <title>Key Generator Tool</title>
 
     <style>
+      /* RESET */
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         font-family: Arial, sans-serif;
+        margin: 0;
         padding: 20px;
-        text-align: center;
+        background: #f6f8fa;
+      }
+
+      /* LAYOUT */
+      .container {
+        display: flex;
+        gap: 24px;
+        align-items: flex-start;
+      }
+
+      .left-panel {
+        flex: 2;
+      }
+
+      .right-panel {
+        flex: 1;
+        background: #fff;
+        border-radius: 12px;
+        padding: 20px;
+        border: 1px solid #eee;
+      }
+
+      /* DEV HEADER */
+      .dev-header {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        margin-bottom: 20px;
       }
 
       .avatar-wrapper {
         position: relative;
-        display: inline-block;
       }
 
       .developer-avatar {
-        width: 120px;
-        height: 120px;
+        width: 80px;
+        height: 80px;
         border-radius: 50%;
-        object-fit: cover;
         border: 3px solid #4caf50;
+        object-fit: cover;
       }
 
       .verified-badge {
         position: absolute;
-        bottom: 5px;
-        right: 5px;
-        width: 20px;
-        height: 20px;
+        bottom: 4px;
+        right: 4px;
+        width: 14px;
+        height: 14px;
         background: #4caf50;
         border-radius: 50%;
-        border: 2px solid white;
+        border: 2px solid #fff;
       }
 
       .developer-name {
-        margin-top: 10px;
         font-weight: bold;
       }
 
       .developer-links img {
-        margin: 5px;
+        margin-right: 6px;
       }
 
-      .form-group {
-        margin-bottom: 12px;
-      }
-
-      input {
-        padding: 6px;
-        width: 250px;
-      }
-
-      button {
-        padding: 8px 16px;
-        cursor: pointer;
-      }
-
+      /* TABS */
       .tabs {
         display: flex;
-        justify-content: center;
-        margin-top: 30px;
+        margin-top: 20px;
+      }
+
+      .tab,
+      .cs-tab {
+        padding: 10px 16px;
+        border: 1px solid #ddd;
+        background: #f1f1f1;
         cursor: pointer;
+        transition: 0.2s;
       }
 
-      .tab {
-        padding: 10px 20px;
-        border: 1px solid #ccc;
-        border-bottom: none;
-        background: #f5f5f5;
-      }
-
-      .tab.active {
-        background: white;
+      .tab.active,
+      .cs-tab.active {
+        background: #fff;
         font-weight: bold;
+        border-bottom: 1px solid #fff;
       }
 
-      .tab-content {
-        border: 1px solid #ccc;
+      /* CONTENT */
+      .tab-content,
+      .cs-tab-content {
+        border: 1px solid #ddd;
         padding: 20px;
+        background: #fff;
         display: none;
-        margin-top: -1px;
       }
 
-      .tab-content.active {
+      .tab-content.active,
+      .cs-tab-content.active {
         display: block;
       }
 
+      /* FORM */
+      .form-group {
+        margin-bottom: 14px;
+      }
+
+      .form-group label {
+        display: block;
+        font-size: 13px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+
+      .form-group input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        transition: 0.2s;
+      }
+
+      .form-group input:focus {
+        border-color: #4caf50;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.15);
+      }
+
+      /* BUTTON */
+      button {
+        padding: 10px 14px;
+        border-radius: 6px;
+        border: none;
+        background: #4caf50;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
+      }
+
+      button:hover {
+        opacity: 0.9;
+      }
+
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+
+      /* DEV MODE BUTTON */
+      .dev-mode-buttons {
+        margin-bottom: 12px;
+      }
+
+      .dev-mode-buttons button {
+        background: #eee;
+        color: #333;
+        margin-right: 6px;
+      }
+
+      .dev-mode-buttons button.active {
+        background: #4caf50;
+        color: #fff;
+      }
+
+      /* RESULT */
+      #result-dev,
+      #result-cs,
+      #result-cs-locales {
+        margin-top: 20px;
+      }
+
+      /* SPINNER */
       .spinner {
-        margin: 10px auto;
-        width: 30px;
-        height: 30px;
-        border: 4px solid #ccc;
+        width: 28px;
+        height: 28px;
+        border: 4px solid #ddd;
         border-top: 4px solid #4caf50;
         border-radius: 50%;
         animation: spin 1s linear infinite;
+        margin: 10px auto;
       }
 
       @keyframes spin {
@@ -104,84 +198,20 @@
         }
       }
 
-      .dev-mode-buttons {
-        margin-bottom: 15px;
-      }
-
-      .dev-mode-buttons button {
-        padding: 8px 16px;
-        margin: 0 5px;
-        border: 1px solid #ccc;
-        background: #f5f5f5;
-        cursor: pointer;
-        transition: all 0.2s ease;
-      }
-
-      .dev-mode-buttons button.active {
-        background: #4caf50;
-        color: white;
-        border-color: #4caf50;
-      }
-
-      .dev-mode-buttons button:hover {
-        opacity: 0.8;
-      }
-
-      #visit-count {
-        transition: transform 0.3s ease;
-      }
-
-      .container {
-        display: flex;
-        gap: 30px;
-        align-items: flex-start;
-      }
-
-      /* LEFT */
-      .left-panel {
-        flex: 2;
-        text-align: left;
-      }
-
-      /* RIGHT */
-      .right-panel {
-        flex: 1;
-        border: 1px solid #ddd;
-        border-radius: 10px;
-        padding: 20px;
-        background: #fafafa;
-      }
-
-      /* DEV INFO */
-      .dev-header {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-      }
-
-      .dev-header .developer-avatar {
-        width: 80px;
-        height: 80px;
-      }
-
-      .dev-header .verified-badge {
-        width: 16px;
-        height: 16px;
-      }
-
       /* DASHBOARD */
       .stat-card {
-        background: white;
-        padding: 15px;
-        margin-bottom: 15px;
+        background: #f9fafb;
         border-radius: 10px;
-        border: 1px solid #eee;
+        padding: 16px;
         text-align: center;
+        margin-bottom: 12px;
+        border: 1px solid #eee;
       }
 
       .stat-number {
-        font-size: 28px;
+        font-size: 26px;
         font-weight: bold;
+        margin-top: 6px;
       }
     </style>
   </head>
@@ -198,7 +228,14 @@
 
           <div>
             <div class="developer-name">Phạm Tuấn Kiệt</div>
-            <div style="font-size: 14px; color: gray">
+            <div
+              style="
+                font-size: 14px;
+                color: gray;
+                margin-top: 5px;
+                margin-bottom: 5px;
+              "
+            >
               Fullstack Developer & React Native Specialist
             </div>
 
@@ -291,61 +328,147 @@
         </div>
 
         <div class="tab-content">
-          <h3>Key generator (2 files)</h3>
-          <form id="form-cs">
-            <div class="form-group">
-              <input type="file" name="file1" required />
+          <h3>CS Tools</h3>
+
+          <div class="tabs">
+            <div class="cs-tab active" onclick="switchCsTab(0)">
+              Merge 2 files
             </div>
-
-            <div class="form-group">
-              <input
-                type="text"
-                name="keyColumnFile1"
-                placeholder="Key Column File 1"
-              />
-            </div>
-
-            <div class="form-group">
-              <input
-                type="text"
-                name="valueColumnFile1"
-                placeholder="Value Column File 1"
-              />
-            </div>
-
-            <hr />
-
-            <div class="form-group">
-              <input type="file" name="file2" required />
-            </div>
-
-            <div class="form-group">
-              <input
-                type="text"
-                name="keyColumnFile2"
-                placeholder="Key Column File 2"
-              />
-            </div>
-
-            <div class="form-group">
-              <input
-                type="text"
-                name="valueColumnFile2"
-                placeholder="Value Column File 2"
-              />
-            </div>
-
-            <button id="button-cs" type="submit">Merge</button>
-          </form>
-
-          <div id="loading-cs" style="margin-top: 15px; display: none">
-            <div class="spinner"></div>
-            <div>Processing...</div>
+            <div class="cs-tab" onclick="switchCsTab(1)">Generate Locales</div>
           </div>
 
-          <div id="result-cs" style="margin-top: 20px; display: none">
-            <p><strong>Download Link:</strong></p>
-            <a id="download-link-cs" href="#" target="_blank"></a>
+          <div class="cs-tab-content active">
+            <h4>Merge 2 files</h4>
+
+            <form id="form-cs">
+              <div class="form-group">
+                <input type="file" name="file1" required />
+              </div>
+
+              <div class="form-group">
+                <input
+                  type="text"
+                  name="keyColumnFile1"
+                  placeholder="Key Column File 1"
+                />
+              </div>
+
+              <div class="form-group">
+                <input
+                  type="text"
+                  name="valueColumnFile1"
+                  placeholder="Value Column File 1"
+                />
+              </div>
+
+              <hr />
+
+              <div class="form-group">
+                <input type="file" name="file2" required />
+              </div>
+
+              <div class="form-group">
+                <input
+                  type="text"
+                  name="keyColumnFile2"
+                  placeholder="Key Column File 2"
+                />
+              </div>
+
+              <div class="form-group">
+                <input
+                  type="text"
+                  name="valueColumnFile2"
+                  placeholder="Value Column File 2"
+                />
+              </div>
+
+              <button id="button-cs" type="submit">Merge</button>
+            </form>
+
+            <div id="loading-cs" style="margin-top: 15px; display: none">
+              <div class="spinner"></div>
+              <div>Processing...</div>
+            </div>
+
+            <div id="result-cs" style="margin-top: 20px; display: none">
+              <p><strong>Download Link:</strong></p>
+              <a id="download-link-cs" href="#" target="_blank"></a>
+            </div>
+          </div>
+
+          <div class="cs-tab-content">
+            <h4>Generate Locales</h4>
+
+            <form id="form-cs-locales">
+              <div class="form-group">
+                <input type="file" name="file" accept=".xlsx" required />
+              </div>
+
+              <div class="form-group">
+                <label
+                  >Worksheet Key - Worksheet that contain your key (default:
+                  worksheet 1)</label
+                >
+                <input
+                  type="text"
+                  name="workSheetKey"
+                  placeholder="Worksheet Key (default: 1)"
+                />
+              </div>
+
+              <div class="form-group">
+                <label
+                  >Key Column - The column specify the key in above worksheet
+                  (default: column 1)</label
+                >
+                <input
+                  type="text"
+                  name="keyColumn"
+                  placeholder="Key Column (default: 1)"
+                />
+              </div>
+
+              <div class="form-group">
+                <label
+                  >Worksheet Value - Worksheet that contain your values
+                  (default: worksheet 1)</label
+                >
+                <input
+                  type="text"
+                  name="workSheetValue"
+                  placeholder="Worksheet Value (default: 1)"
+                />
+              </div>
+
+              <div class="form-group">
+                <label
+                  >Value Columns - List oute your selects columns value,
+                  seperated by "," (e.g: 2,3,4)</label
+                >
+                <input
+                  type="text"
+                  name="valueColumns"
+                  placeholder="Value Columns (e.g: 2,3,4)"
+                  required
+                />
+              </div>
+
+              <button id="button-cs-locales" type="submit">Generate ZIP</button>
+            </form>
+
+            <div
+              id="loading-cs-locales"
+              style="margin-top: 15px; display: none"
+            >
+              <div class="spinner"></div>
+              <div>Processing...</div>
+            </div>
+
+            <div id="result-cs-locales" style="margin-top: 20px; display: none">
+              <p><strong>Download Link:</strong></p>
+              <a id="download-link-cs-locales" href="#" target="_blank"></a>
+            </div>
           </div>
         </div>
       </div>
@@ -377,6 +500,10 @@
         <div class="stat-card">
           <div>📑 Merge Files</div>
           <div id="merge-count" class="stat-number">0</div>
+        </div>
+        <div class="stat-card">
+          <div>🌎 Generate Locales</div>
+          <div id="generate-locales" class="stat-number">0</div>
         </div>
       </div>
     </div>
