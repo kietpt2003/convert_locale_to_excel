@@ -8,14 +8,16 @@ import { Writable } from "stream";
 import dotenv from "dotenv";
 import { put } from "@vercel/blob";
 import cors from "cors";
+import mongoose from "mongoose";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
 import parseExcelToObject from "./utils/parseExcelToObject.js";
 import generateExcelBuffer from "./utils/generateExcelBuffer.js";
 import generateDuplicateExcel from "./utils/generateDuplicateExcel.js";
-
-const uniqueIPs = new Set<string>();
+import { Visitor } from "./models/Visitors.js";
+import { ApiUsage } from "./models/ApiUsage.js";
+import { shouldTrackEndpoint } from "./utils/shouldTrackEndpoint.js";
 
 const app = express();
 const PORT = 3000;
@@ -28,24 +30,76 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use((req, res, next) => {
-  const ip =
-    req.headers["x-forwarded-for"]?.toString().split(",")[0] ||
-    req.socket.remoteAddress ||
-    "";
+const DB_URL = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_USER_PASSWORD}@${process.env.DB_CLUSTER_PATH}`;
+const connect = mongoose.connect(DB_URL, { family: 4, dbName: process.env.DB_NAME });
 
-  if (ip) {
-    uniqueIPs.add(ip);
-  }
-
-  console.log("Unique visits:", uniqueIPs.size);
-  next();
+connect.then((db) => {
+  console.log("Connect server success");
 });
 
-app.get("/visits", (req, res) => {
-  res.json({
-    totalUnique: uniqueIPs.size,
-  });
+app.use(async (req, res, next) => {
+  try {
+    const ip =
+      req.headers["x-forwarded-for"]?.toString().split(",")[0] ||
+      req.socket.remoteAddress ||
+      "";
+
+    if (ip) {
+      const exists = await Visitor.exists({ ip });
+
+      if (!exists) {
+        await Visitor.create({ ip });
+        console.log("New visitor:", ip);
+      }
+    }
+
+    next();
+  } catch (err) {
+    console.error("Track visit error:", err);
+    next();
+  }
+});
+
+app.use(async (req, res, next) => {
+  try {
+    if (!shouldTrackEndpoint(req)) {
+      return next();
+    }
+
+    const endpoint = req.path;
+    const method = req.method;
+
+    const date = new Date().toISOString().slice(0, 10);
+
+    await ApiUsage.findOneAndUpdate(
+      { endpoint, method, date },
+      { $inc: { count: 1 } },
+      {
+        upsert: true,
+        returnDocument: "after",
+      }
+    );
+
+    next();
+  } catch (err) {
+    console.error("Track API usage error:", err);
+    next();
+  }
+});
+
+app.get("/visits", async (req, res) => {
+  try {
+    const totalUnique = await Visitor.countDocuments();
+
+    res.json({
+      totalUnique,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to get visits",
+    });
+  }
 });
 
 app.get("/blob-token", async (_req: Request, res: Response) => {
@@ -322,6 +376,40 @@ app.post("/upload-excel-merge-zip", async (req: Request, res: Response) => {
     console.error(err);
     res.status(500).json({
       message: "Error processing files",
+    });
+  }
+});
+
+app.get("/api-usage/total", async (req, res) => {
+  try {
+    const endpoint = req.query.endpoint as string | undefined;
+
+    const matchStage: any = {};
+
+    if (endpoint) {
+      matchStage.endpoint = endpoint;
+    }
+
+    const result = await ApiUsage.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: "$count" },
+        },
+      },
+    ]);
+
+    const total = result[0]?.total || 0;
+
+    res.json({
+      endpoint: endpoint || "ALL",
+      total,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      message: "Failed to get usage",
     });
   }
 });
