@@ -369,6 +369,14 @@
           <div class="tabs">
             <div class="tab active" onclick="switchTab(0)">For Dev</div>
             <div class="tab" onclick="switchTab(1)">For CS</div>
+            <div
+              class="tab"
+              id="tab-admin"
+              onclick="switchTab(2)"
+              style="display: none; background: #ffebee; color: #c62828"
+            >
+              User Management (Admin)
+            </div>
           </div>
 
           <div class="tab-content active">
@@ -595,6 +603,83 @@
                 <p><strong>Download Link:</strong></p>
                 <a id="download-link-cs-locales" href="#" target="_blank"></a>
               </div>
+            </div>
+          </div>
+
+          <div class="tab-content" id="content-admin">
+            <h3>⚙️ User management</h3>
+            <p
+              style="
+                font-size: 14px;
+                color: gray;
+                margin-top: -10px;
+                margin-bottom: 20px;
+              "
+            >
+              Add email to access system
+            </p>
+
+            <form
+              id="form-add-user"
+              style="display: flex; gap: 10px; margin-bottom: 20px"
+            >
+              <input
+                type="email"
+                name="email"
+                placeholder="Email"
+                required
+                style="
+                  flex: 1;
+                  padding: 10px;
+                  border: 1px solid #ccc;
+                  border-radius: 6px;
+                "
+              />
+              <select
+                name="role"
+                style="
+                  padding: 10px;
+                  border-radius: 6px;
+                  border: 1px solid #ccc;
+                "
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+              <button
+                type="submit"
+                id="btn-add-user"
+                style="background: #1976d2"
+              >
+                Permission
+              </button>
+            </form>
+
+            <div
+              style="
+                border: 1px solid #eee;
+                border-radius: 8px;
+                overflow: hidden;
+              "
+            >
+              <table
+                style="width: 100%; border-collapse: collapse; text-align: left"
+              >
+                <thead style="background: #f9fafb">
+                  <tr>
+                    <th style="padding: 12px; border-bottom: 1px solid #eee">
+                      Email
+                    </th>
+                    <th style="padding: 12px; border-bottom: 1px solid #eee">
+                      Permisison
+                    </th>
+                    <th style="padding: 12px; border-bottom: 1px solid #eee">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="user-list-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>

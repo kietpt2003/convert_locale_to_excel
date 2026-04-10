@@ -98,15 +98,55 @@ function updateUserInfoUI() {
 
   const user = parseJwt(authToken);
   if (user) {
-    // Cập nhật Avatar
     const avatarImg = document.getElementById("user-avatar");
     if (user.picture) {
       avatarImg.src = user.picture;
       avatarImg.style.display = "block";
     }
 
-    document.getElementById("user-name").textContent = user.name || "User";
+    // Hiển thị thêm chữ (Admin) nếu có quyền
+    const roleText = user.role === "admin" ? " (Admin)" : "";
+    document.getElementById("user-name").textContent =
+      (user.name || "User") + roleText;
     document.getElementById("user-email").textContent = user.email || "";
+
+    // NẾU LÀ ADMIN -> HIỆN TAB QUẢN LÝ VÀ TẢI DANH SÁCH
+    if (user.role === "admin") {
+      document.getElementById("tab-admin").style.display = "block";
+      loadAdminUsers();
+
+      // Gắn sự kiện submit cho form Add User
+      const formAdd = document.getElementById("form-add-user");
+      // Tránh việc bị gán sự kiện nhiều lần nếu hàm này gọi lại
+      formAdd.onsubmit = async (e) => {
+        e.preventDefault();
+        const email = e.target.email.value;
+        const role = e.target.role.value;
+        const btn = document.getElementById("btn-add-user");
+
+        btn.textContent = "Đang thêm...";
+        btn.disabled = true;
+
+        try {
+          const res = await fetchWithAuth("/admin/users", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, role }),
+          });
+          const data = await res.json();
+
+          if (!res.ok) throw new Error(data.message);
+
+          e.target.reset(); // Xóa input
+          loadAdminUsers(); // Tải lại bảng
+        } catch (err) {
+          alert(`❌ Lỗi: ${err.message}`);
+        } finally {
+          btn.textContent = "Cấp quyền";
+          btn.disabled = false;
+        }
+      };
+    }
   }
 }
 
@@ -579,7 +619,61 @@ export function init() {
 
   window.signOut = signOut;
 
+  window.deleteAdminUser = async function (email) {
+    if (
+      !confirm(
+        `⚠️ Are you sure you want to revoke login access for the email address: ${email}?`,
+      )
+    )
+      return;
+
+    try {
+      const res = await fetchWithAuth(`/admin/users/${email}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.message);
+      loadAdminUsers(); // Tải lại bảng
+    } catch (e) {
+      alert(`❌ Lỗi: ${e.message}`);
+    }
+  };
+
   tabDev();
 
   tabCS();
+}
+
+async function loadAdminUsers() {
+  try {
+    const res = await fetchWithAuth("/admin/users");
+    if (!res.ok) return;
+    const users = await res.json();
+
+    const tbody = document.getElementById("user-list-tbody");
+    let html = "";
+
+    users.forEach((u) => {
+      // Đổi màu badge quyền
+      const roleBadge =
+        u.role === "admin"
+          ? `<span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">ADMIN</span>`
+          : `<span style="background: #e3f2fd; color: #1565c0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">USER</span>`;
+
+      html += `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #eee;">${u.email}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee;">${roleBadge}</td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee;">
+            <button onclick="deleteAdminUser('${u.email}')" style="background: #ef4444; padding: 6px 12px; font-size: 12px;">Xóa</button>
+          </td>
+        </tr>
+      `;
+    });
+
+    tbody.innerHTML = html;
+  } catch (e) {
+    console.error("Load users failed", e);
+  }
 }

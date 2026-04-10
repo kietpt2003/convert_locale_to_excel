@@ -20,7 +20,9 @@ import generateExcelBuffer from "./utils/generateExcelBuffer.js";
 import generateDuplicateExcel from "./utils/generateDuplicateExcel.js";
 import { Visitor } from "./models/Visitors.js";
 import { ApiUsage } from "./models/ApiUsage.js";
+import { AuthorizedUser } from "./models/AuthorizedUser.js";
 import { shouldTrackEndpoint } from "./utils/shouldTrackEndpoint.js";
+import { verifyToken, verifyAdmin } from "./middleware/validation.js";
 
 const app = express();
 const PORT = 3000;
@@ -41,19 +43,6 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 connect.then((db) => {
   console.log("Connect server success");
 });
-
-const verifyToken = (req: Request, res: Response, next: any) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ message: "Unauthorized" });
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-    (req as any).user = decoded;
-    next();
-  } catch (err) {
-    return res.status(403).json({ message: "Invalid token" });
-  }
-};
 
 app.use(async (req, res, next) => {
   try {
@@ -117,8 +106,26 @@ app.post("/auth/google", async (req: Request, res: Response) => {
     const payload = ticket.getPayload();
     if (!payload) return res.status(400).json({ message: "Invalid Google token" });
 
+    const email = payload.email;
+
+    let authUser = await AuthorizedUser.findOne({ email });
+
+    if (!authUser) {
+      if (email === process.env.ADMIN_EMAIL) {
+        authUser = await AuthorizedUser.create({ email, role: "admin" });
+      } else {
+        console.log(`[Bảo mật] Chặn đăng nhập từ: ${email}`);
+        return res.status(403).json({ message: "Access Denied. Please contact Admin for IT Support" });
+      }
+    }
+
     const customToken = jwt.sign(
-      { email: payload.email, name: payload.name, picture: payload.picture },
+      {
+        email: payload.email,
+        name: payload.name,
+        picture: payload.picture,
+        role: authUser.role
+      },
       process.env.JWT_SECRET as string,
       { expiresIn: "1d" }
     );
@@ -716,6 +723,45 @@ app.post("/v2/generate-excels-for-each-locales", verifyToken, async (req: Reques
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Error processing files" });
+  }
+});
+
+app.get("/admin/users", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const users = await AuthorizedUser.find().sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: "Cannot get user list" });
+  }
+});
+
+app.post("/admin/users", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    if (!email) return res.status(400).json({ message: "Email cannot empty" });
+
+    const exists = await AuthorizedUser.exists({ email });
+    if (exists) return res.status(400).json({ message: "Email existed" });
+
+    await AuthorizedUser.create({ email, role: role || "user" });
+    res.json({ message: "Add user success" });
+  } catch (err) {
+    res.status(500).json({ message: "Create user failed." });
+  }
+});
+
+app.delete("/admin/users/:email", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    if (email === process.env.ADMIN_EMAIL) {
+      return res.status(400).json({ message: "Cannot delete Super Admin" });
+    }
+
+    await AuthorizedUser.deleteOne({ email });
+    res.json({ message: "Delete user success" });
+  } catch (err) {
+    res.status(500).json({ message: "Delete user failed." });
   }
 });
 
