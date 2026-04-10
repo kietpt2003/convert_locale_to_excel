@@ -9,6 +9,7 @@ import dotenv from "dotenv";
 import { put } from "@vercel/blob";
 import cors from "cors";
 import mongoose from "mongoose";
+import * as XLSX from "xlsx";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -214,6 +215,60 @@ app.post(
     }
   }
 );
+
+app.post("/v2/upload-excel", async (req: Request, res: Response) => {
+  try {
+    const { fileUrl } = req.body;
+
+    if (!fileUrl) return res.status(400).send("No file uploaded");
+
+    const fileRes = await fetch(fileUrl);
+
+    if (!fileRes.ok) {
+      return res.status(400).json({ message: "Cannot fetch files from URL" });
+    }
+
+    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+
+    const keyColumn = Number(req.body.keyColumn) || 1;
+    const valueColumn = Number(req.body.valueColumn) || 2;
+
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+    const result: Record<string, string> = {};
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row) continue;
+
+      const key = row[keyColumn - 1]?.toString().trim();
+      const value = row[valueColumn - 1]?.toString().trim();
+
+      if (key) {
+        result[key] = value || "";
+      }
+    }
+
+    const jsContent = generateJsFile(result);
+    const jsBuffer = Buffer.from(jsContent, "utf-8");
+
+    const blob = await put("en.js", jsBuffer, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      allowOverwrite: true
+    });
+
+    return res.json({
+      url: blob.url,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error processing Excel file");
+  }
+});
 
 const uploadMultiple = upload.fields([
   { name: "file1", maxCount: 1 },
@@ -425,7 +480,7 @@ app.post("/generate-excels-for-each-locales", async (req: Request, res: Response
     } = req.body;
 
     console.log('check', req.body);
-    
+
 
     if (!fileUrl) {
       return res.status(400).json({ message: "Missing file URLs" });

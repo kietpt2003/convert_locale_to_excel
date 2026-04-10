@@ -47,7 +47,7 @@ function switchCsTab(index) {
     t.classList.toggle("active", i === index);
     contents[i].classList.toggle("active", i === index);
   });
-};
+}
 
 // ================= ANIMATION =================
 export function animateCount(element, to) {
@@ -59,9 +59,7 @@ export function animateCount(element, to) {
   const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 
   function update(currentTime) {
-    const progress = easeOut(
-      Math.min((currentTime - startTime) / duration, 1)
-    );
+    const progress = easeOut(Math.min((currentTime - startTime) / duration, 1));
 
     const value = Math.floor(progress * to);
     element.textContent = value;
@@ -92,10 +90,7 @@ export async function loadVisits() {
 // ================= UPLOAD =================
 export async function uploadFile(file, token) {
   const ext = file.name.split(".").pop();
-  const nameWithoutExt = file.name.substring(
-    0,
-    file.name.lastIndexOf(".")
-  );
+  const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf("."));
 
   const newName = `${nameWithoutExt}_${Date.now()}.${ext}`;
 
@@ -200,7 +195,7 @@ function tabDev() {
 
         button.textContent = "Processing...";
 
-        const res = await fetch("/upload-excel", {
+        const res = await fetch("/v2/upload-excel", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -232,82 +227,80 @@ function tabDev() {
 }
 
 function tabCS() {
-  document
-    .getElementById("form-cs")
-    .addEventListener("submit", async (e) => {
-      e.preventDefault();
+  document.getElementById("form-cs").addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-      const form = e.target;
+    const form = e.target;
 
-      const file1 = form.querySelector('input[name="file1"]').files[0];
-      const file2 = form.querySelector('input[name="file2"]').files[0];
+    const file1 = form.querySelector('input[name="file1"]').files[0];
+    const file2 = form.querySelector('input[name="file2"]').files[0];
 
-      const keyColumnFile1 = form.keyColumnFile1.value || 1;
-      const valueColumnFile1 = form.valueColumnFile1.value || 2;
-      const keyColumnFile2 = form.keyColumnFile2.value || 1;
-      const valueColumnFile2 = form.valueColumnFile2.value || 2;
+    const keyColumnFile1 = form.keyColumnFile1.value || 1;
+    const valueColumnFile1 = form.valueColumnFile1.value || 2;
+    const keyColumnFile2 = form.keyColumnFile2.value || 1;
+    const valueColumnFile2 = form.valueColumnFile2.value || 2;
 
-      const resultDiv = document.getElementById("result-cs");
-      const link = document.getElementById("download-link-cs");
-      const loading = document.getElementById("loading-cs");
-      const button = document.getElementById("button-cs");
+    const resultDiv = document.getElementById("result-cs");
+    const link = document.getElementById("download-link-cs");
+    const loading = document.getElementById("loading-cs");
+    const button = document.getElementById("button-cs");
 
-      link.href = "";
-      link.textContent = "";
-      resultDiv.style.display = "none";
+    link.href = "";
+    link.textContent = "";
+    resultDiv.style.display = "none";
 
-      loading.style.display = "block";
-      button.disabled = true;
-      button.textContent = "Uploading...";
+    loading.style.display = "block";
+    button.disabled = true;
+    button.textContent = "Uploading...";
 
-      try {
-        const resToken = await fetch("/blob-token", {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        const dataToken = await resToken.json();
+    try {
+      const resToken = await fetch("/blob-token", {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      const dataToken = await resToken.json();
 
-        const [url1, url2] = await Promise.all([
-          uploadFile(file1, dataToken.token),
-          uploadFile(file2, dataToken.token),
-        ]);
+      const [url1, url2] = await Promise.all([
+        uploadFile(file1, dataToken.token),
+        uploadFile(file2, dataToken.token),
+      ]);
 
-        button.textContent = "Processing...";
+      button.textContent = "Processing...";
 
-        const res = await fetch("/upload-excel-merge-zip", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            file1Url: url1,
-            file2Url: url2,
-            keyColumnFile1,
-            valueColumnFile1,
-            keyColumnFile2,
-            valueColumnFile2,
-          }),
-        });
+      const res = await fetch("/upload-excel-merge-zip", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          file1Url: url1,
+          file2Url: url2,
+          keyColumnFile1,
+          valueColumnFile1,
+          keyColumnFile2,
+          valueColumnFile2,
+        }),
+      });
 
-        const data = await res.json();
+      const data = await res.json();
 
-        requestAnimationFrame(() => {
-          link.href = data.url;
-          link.textContent = data.url;
-          resultDiv.style.display = "block";
-        });
-        loadStats();
-      } catch (err) {
-        alert("Something went wrong!");
-        console.error(err);
-      } finally {
-        loading.style.display = "none";
-        button.disabled = false;
-        button.textContent = "Merge";
-      }
-    });
+      requestAnimationFrame(() => {
+        link.href = data.url;
+        link.textContent = data.url;
+        resultDiv.style.display = "block";
+      });
+      loadStats();
+    } catch (err) {
+      alert("Something went wrong!");
+      console.error(err);
+    } finally {
+      loading.style.display = "none";
+      button.disabled = false;
+      button.textContent = "Merge";
+    }
+  });
 
   document
     .getElementById("form-cs-locales")
@@ -353,9 +346,7 @@ function tabCS() {
         return;
       }
 
-      const valueColumns = rawValueColumns
-        .split(",")
-        .map((v) => v.trim());
+      const valueColumns = rawValueColumns.split(",").map((v) => v.trim());
 
       if (valueColumns.length === 0) {
         alert("Value Columns is required");
@@ -363,12 +354,12 @@ function tabCS() {
       }
 
       const invalidColumns = valueColumns.filter(
-        (v) => isNaN(v) || Number(v) <= 0
+        (v) => isNaN(v) || Number(v) <= 0,
       );
 
       if (invalidColumns.length > 0) {
         alert(
-          `Invalid valueColumns: ${invalidColumns.join(", ")}. Must be numbers > 0`
+          `Invalid valueColumns: ${invalidColumns.join(", ")}. Must be numbers > 0`,
         );
         return;
       }
@@ -431,9 +422,12 @@ export async function loadStats() {
     const endpoints = [
       { key: "total-access", endpoint: "/" },
       { key: "upload-count", endpoint: "/upload" },
-      { key: "upload-excel-count", endpoint: "/upload-excel" },
+      { key: "upload-excel-count", endpoint: "/v2/upload-excel" },
       { key: "merge-count", endpoint: "/upload-excel-merge-zip" },
-      { key: "generate-locales", endpoint: "/generate-excels-for-each-locales"}
+      {
+        key: "generate-locales",
+        endpoint: "/generate-excels-for-each-locales",
+      },
     ];
 
     for (const item of endpoints) {
