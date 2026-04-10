@@ -10,6 +10,8 @@ import { put } from "@vercel/blob";
 import cors from "cors";
 import mongoose from "mongoose";
 import * as XLSX from "xlsx";
+import { OAuth2Client } from "google-auth-library";
+import jwt from "jsonwebtoken";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -34,9 +36,24 @@ app.use(express.urlencoded({ extended: true }));
 const DB_URL = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_USER_PASSWORD}@${process.env.DB_CLUSTER_PATH}`;
 const connect = mongoose.connect(DB_URL, { family: 4, dbName: process.env.DB_NAME });
 
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 connect.then((db) => {
   console.log("Connect server success");
 });
+
+const verifyToken = (req: Request, res: Response, next: any) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
+    (req as any).user = decoded;
+    next();
+  } catch (err) {
+    return res.status(403).json({ message: "Invalid token" });
+  }
+};
 
 app.use(async (req, res, next) => {
   try {
@@ -88,7 +105,32 @@ app.use(async (req, res, next) => {
   }
 });
 
-app.get("/visits", async (req, res) => {
+app.post("/auth/google", async (req: Request, res: Response) => {
+  try {
+    const { token } = req.body;
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload) return res.status(400).json({ message: "Invalid Google token" });
+
+    const customToken = jwt.sign(
+      { email: payload.email, name: payload.name, picture: payload.picture },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "1d" }
+    );
+
+    res.json({ token: customToken, user: payload });
+  } catch (error) {
+    console.error("Auth error:", error);
+    res.status(500).json({ message: "Authentication failed" });
+  }
+});
+
+app.get("/visits", verifyToken, async (req, res) => {
   try {
     const totalUnique = await Visitor.countDocuments();
 
@@ -103,7 +145,7 @@ app.get("/visits", async (req, res) => {
   }
 });
 
-app.get("/blob-token", async (_req: Request, res: Response) => {
+app.get("/blob-token", verifyToken, async (_req: Request, res: Response) => {
   try {
     return res.json({
       token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -116,18 +158,18 @@ app.get("/blob-token", async (_req: Request, res: Response) => {
   }
 });
 
-app.post("/upload", async (req: Request, res: Response) => {
+app.post("/upload", verifyToken, async (req: Request, res: Response) => {
   try {
     const {
       fileUrl,
     } = req.body;
 
-    if (!fileUrl) return res.status(400).send("No file uploaded");
+    if (!fileUrl) return res.status(400).json({ message: "No file uploaded" });
 
     const fileRes = await fetch(fileUrl);
 
     if (!fileRes.ok) {
-      return res.status(400).json({ message: "Cannot fetch files from URL" });
+      return res.status(400).json({ message: "Cannot fetch file from Blob Storage" });
     }
 
     const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
@@ -154,19 +196,20 @@ app.post("/upload", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Error processing file");
+    const errMsg = err instanceof Error ? err.message : "Error processing JS file";
+    return res.status(500).json({ message: errMsg });
   }
 });
 
 app.post(
-  "/upload-excel",
+  "/upload-excel", verifyToken,
   async (req: Request, res: Response) => {
     try {
       const {
         fileUrl,
       } = req.body;
 
-      if (!fileUrl) return res.status(400).send("No file uploaded");
+      if (!fileUrl) return res.status(400).json({ message: "No file uploaded" });
 
       const fileRes = await fetch(fileUrl);
 
@@ -211,16 +254,16 @@ app.post(
       });
     } catch (err) {
       console.error(err);
-      res.status(500).send("Error processing Excel file");
+      return res.status(500).json({ message: "Error processing Excel file" });
     }
   }
 );
 
-app.post("/v2/upload-excel", async (req: Request, res: Response) => {
+app.post("/v2/upload-excel", verifyToken, async (req: Request, res: Response) => {
   try {
     const { fileUrl } = req.body;
 
-    if (!fileUrl) return res.status(400).send("No file uploaded");
+    if (!fileUrl) return res.status(400).json({ message: "No file uploaded" });
 
     const fileRes = await fetch(fileUrl);
 
@@ -266,7 +309,7 @@ app.post("/v2/upload-excel", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).send("Error processing Excel file");
+    return res.status(500).json({ message: "Error processing Excel file" });
   }
 });
 
@@ -276,6 +319,7 @@ const uploadMultiple = upload.fields([
 ]);
 app.post(
   "/upload-excel-merge",
+  verifyToken,
   uploadMultiple,
   async (req: Request, res: Response) => {
     try {
@@ -287,7 +331,7 @@ app.post(
       const file2 = files?.file2?.[0];
 
       if (!file1 || !file2) {
-        return res.status(400).send("Need 2 files: file1 & file2");
+        return res.status(400).json({ message: "Need 2 files: file1 & file2" });
       }
 
       const keyColumnFile1 = Number(req.body.keyColumnFile1) || 1;
@@ -323,12 +367,12 @@ app.post(
       res.send(jsContent);
     } catch (err) {
       console.error(err);
-      res.status(500).send("Error merging Excel files");
+      return res.status(500).json({ message: "Error merging Excel files: Invalid format" });
     }
   }
 );
 
-app.post("/upload-excel-merge-zip", async (req: Request, res: Response) => {
+app.post("/upload-excel-merge-zip", verifyToken, async (req: Request, res: Response) => {
   try {
     const {
       file1Url,
@@ -435,7 +479,7 @@ app.post("/upload-excel-merge-zip", async (req: Request, res: Response) => {
   }
 });
 
-app.get("/api-usage/total", async (req, res) => {
+app.get("/api-usage/total", verifyToken, async (req, res) => {
   try {
     const endpoint = req.query.endpoint as string | undefined;
 
@@ -469,7 +513,7 @@ app.get("/api-usage/total", async (req, res) => {
   }
 });
 
-app.post("/generate-excels-for-each-locales", async (req: Request, res: Response) => {
+app.post("/generate-excels-for-each-locales", verifyToken, async (req: Request, res: Response) => {
   try {
     const {
       fileUrl,
@@ -478,9 +522,6 @@ app.post("/generate-excels-for-each-locales", async (req: Request, res: Response
       workSheetValue = 1,
       valueColumns = [],
     } = req.body;
-
-    console.log('check', req.body);
-
 
     if (!fileUrl) {
       return res.status(400).json({ message: "Missing file URLs" });
@@ -580,6 +621,101 @@ app.post("/generate-excels-for-each-locales", async (req: Request, res: Response
     res.status(500).json({
       message: "Error processing files",
     });
+  }
+});
+
+app.post("/v2/generate-excels-for-each-locales", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const {
+      fileUrl,
+      workSheetKey = 1,
+      keyColumn = 1,
+      workSheetValue = 1,
+      valueColumns = [],
+    } = req.body;
+
+    if (!fileUrl) return res.status(400).json({ message: "Missing file URLs" });
+
+    const fileRes = await fetch(fileUrl);
+    if (!fileRes.ok) return res.status(400).json({ message: "Cannot fetch files from URL" });
+
+    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+
+    if (!Array.isArray(valueColumns) || valueColumns.length === 0) {
+      return res.status(400).json({ message: "No valueColumns provided" });
+    }
+
+    const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+
+    const keySheetName = workbook.SheetNames[workSheetKey - 1];
+    const valueSheetName = workbook.SheetNames[workSheetValue - 1];
+
+    if (!keySheetName || !valueSheetName) {
+      return res.status(400).json({ message: "Worksheet not found" });
+    }
+
+    const keySheet = workbook.Sheets[keySheetName];
+    const valueSheet = workbook.Sheets[valueSheetName];
+
+    const keyRows = XLSX.utils.sheet_to_json(keySheet, { header: 1 }) as any[][];
+    const valueRows = XLSX.utils.sheet_to_json(valueSheet, { header: 1 }) as any[][];
+
+    const headerRow = valueRows[0] || [];
+
+    const results: Record<string, Record<string, string>> = {};
+
+    valueColumns.forEach((colIndex: number) => {
+      const header = headerRow[colIndex - 1]?.toString().trim() || `col_${colIndex}`;
+      results[header] = {};
+    });
+
+    const maxRows = Math.max(keyRows.length, valueRows.length);
+    for (let i = 1; i < maxRows; i++) {
+      const kRow = keyRows[i];
+      const vRow = valueRows[i];
+
+      if (!kRow) continue;
+
+      const key = kRow[keyColumn - 1]?.toString().trim();
+      if (!key) continue;
+
+      valueColumns.forEach((colIndex: number) => {
+        const header = headerRow[colIndex - 1]?.toString().trim() || `col_${colIndex}`;
+        const value = vRow ? vRow[colIndex - 1]?.toString().trim() : "";
+        results[header][key] = value || "";
+      });
+    }
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    const chunks: Buffer[] = [];
+    const writable = new Writable({
+      write(chunk, _, cb) {
+        chunks.push(chunk);
+        cb();
+      },
+    });
+
+    archive.pipe(writable);
+
+    for (const locale of Object.keys(results)) {
+      const data = results[locale];
+      const excelBuffer = await generateExcelBuffer(data);
+      archive.append(excelBuffer as any, { name: `${locale}.xlsx` });
+    }
+
+    await archive.finalize();
+    const zipBuffer = Buffer.concat(chunks);
+
+    const blob = await put(`locales_${Date.now()}.zip`, zipBuffer, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      allowOverwrite: true,
+    });
+
+    return res.json({ url: blob.url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error processing files" });
   }
 });
 

@@ -4,10 +4,88 @@
     <meta charset="UTF-8" />
     <title>Key Generator Tool</title>
 
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <style>
-      /* RESET */
       * {
         box-sizing: border-box;
+      }
+
+      .login-card {
+        background: #fff;
+        padding: 40px;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        text-align: center;
+        max-width: 420px;
+        width: 90%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .login-card .avatar-wrapper {
+        margin-bottom: 12px;
+      }
+
+      .login-card .developer-name {
+        font-size: 20px;
+        color: #1f2937;
+      }
+
+      .login-card h2 {
+        margin: 24px 0 8px 0;
+        font-size: 22px;
+        color: #111827;
+      }
+
+      .login-card p {
+        color: #6b7280;
+        margin-bottom: 24px;
+        font-size: 15px;
+      }
+
+      .login-card .developer-links {
+        margin-top: 12px;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      /* ================= HEADER BỐ CỤC MỚI ================= */
+      .main-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 20px;
+      }
+
+      .btn-signout {
+        background: #ef4444; /* Màu đỏ */
+        color: white;
+        padding: 8px 16px;
+        font-size: 14px;
+      }
+
+      .btn-signout:hover {
+        background: #dc2626;
+      }
+
+      #login-screen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #f6f8fa;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      #main-app {
+        display: none;
       }
 
       body {
@@ -217,300 +295,351 @@
   </head>
 
   <body>
-    <div class="container">
-      <!-- LEFT -->
-      <div class="left-panel">
-        <div class="dev-header">
-          <div class="avatar-wrapper">
-            <img class="developer-avatar" src="assets/avatar.JPG" />
-            <div class="verified-badge"></div>
-          </div>
+    <div id="login-screen">
+      <div class="login-card">
+        <h2>Key Generator Tool</h2>
 
-          <div>
-            <div class="developer-name">Phạm Tuấn Kiệt</div>
-            <div
-              style="
-                font-size: 14px;
-                color: gray;
-                margin-top: 5px;
-                margin-bottom: 5px;
-              "
-            >
-              Fullstack Developer & React Native Specialist
-            </div>
-
-            <div class="developer-links">
-              <a
-                href="https://www.facebook.com/tuankiet29012003"
-                target="_blank"
-              >
-                <img
-                  src="https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white"
-                />
-              </a>
-              <a href="https://www.linkedin.com/in/kietpt2003" target="_blank">
-                <img
-                  src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white"
-                />
-              </a>
-            </div>
-          </div>
+        <div class="avatar-wrapper">
+          <img class="developer-avatar" src="assets/avatar.JPG" />
+          <div class="verified-badge"></div>
         </div>
 
-        <h2 style="margin-top: 20px">Key Generator Tool</h2>
-
-        <div class="tabs">
-          <div class="tab active" onclick="switchTab(0)">For Dev</div>
-          <div class="tab" onclick="switchTab(1)">For CS</div>
-        </div>
-
-        <div class="tab-content active">
-          <h3>Dev Tools</h3>
-
-          <div class="dev-mode-buttons">
-            <button
-              id="btn-js"
-              class="active"
-              onclick="switchDevMode('js-to-excel')"
-            >
-              JS → Excel
-            </button>
-            <button id="btn-excel" onclick="switchDevMode('excel-to-js')">
-              Excel → JS
-            </button>
+        <div>
+          <div class="developer-name">Phạm Tuấn Kiệt</div>
+          <div style="font-size: 14px; color: gray; margin-top: 5px">
+            Fullstack Developer & React Native Specialist
           </div>
-
-          <!-- JS → Excel -->
-          <form id="form-dev-js">
-            <div class="form-group">
-              <input type="file" name="file" accept=".js" required />
-            </div>
-
-            <button id="button-dev-js" type="submit">Convert JS → Excel</button>
-          </form>
-
-          <!-- Excel → JS -->
-          <form id="form-dev-excel" style="display: none">
-            <div class="form-group">
-              <input type="file" name="file" accept=".xlsx" required />
-            </div>
-
-            <div class="form-group">
-              <input
-                type="text"
-                name="keyColumn"
-                placeholder="Key Column (default 1)"
+          <div class="developer-links">
+            <a href="https://www.facebook.com/tuankiet29012003" target="_blank">
+              <img
+                src="https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white"
               />
-            </div>
-
-            <div class="form-group">
-              <input
-                type="text"
-                name="valueColumn"
-                placeholder="Value Column (default 2)"
+            </a>
+            <a href="https://www.linkedin.com/in/kietpt2003" target="_blank">
+              <img
+                src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white"
               />
-            </div>
-
-            <button id="button-dev-excel" type="submit">
-              Convert Excel → JS
-            </button>
-          </form>
-
-          <div id="loading-dev" style="margin-top: 15px; display: none">
-            <div class="spinner"></div>
-            <div>Processing...</div>
-          </div>
-
-          <div id="result-dev" style="margin-top: 20px; display: none">
-            <p><strong>Download Link:</strong></p>
-            <a id="download-link-dev" href="#" target="_blank"></a>
+            </a>
           </div>
         </div>
 
-        <div class="tab-content">
-          <h3>CS Tools</h3>
+        <p>Please sign in to continue</p>
+        <div id="googleButtonDiv"></div>
+      </div>
+    </div>
+
+    <div id="main-app">
+      <div class="container">
+        <div class="left-panel">
+          <div class="main-header">
+            <div class="dev-header" style="margin-bottom: 0">
+              <div class="avatar-wrapper">
+                <img
+                  id="user-avatar"
+                  class="developer-avatar"
+                  src=""
+                  alt="User Avatar"
+                  style="display: none"
+                />
+                <div class="verified-badge"></div>
+              </div>
+
+              <div>
+                <div id="user-name" class="developer-name">Loading...</div>
+
+                <div
+                  id="user-email"
+                  style="
+                    font-size: 14px;
+                    color: gray;
+                    margin-top: 5px;
+                    margin-bottom: 5px;
+                  "
+                >
+                  ...
+                </div>
+              </div>
+            </div>
+
+            <button class="btn-signout" onclick="signOut()">Sign Out</button>
+          </div>
+
+          <h2 style="margin-top: 20px">Key Generator Tool</h2>
 
           <div class="tabs">
-            <div class="cs-tab active" onclick="switchCsTab(0)">
-              Merge 2 files
-            </div>
-            <div class="cs-tab" onclick="switchCsTab(1)">Generate Locales</div>
+            <div class="tab active" onclick="switchTab(0)">For Dev</div>
+            <div class="tab" onclick="switchTab(1)">For CS</div>
           </div>
 
-          <div class="cs-tab-content active">
-            <h4>Merge 2 files</h4>
+          <div class="tab-content active">
+            <h3>Dev Tools</h3>
 
-            <form id="form-cs">
+            <div class="dev-mode-buttons">
+              <button
+                id="btn-js"
+                class="active"
+                onclick="switchDevMode('js-to-excel')"
+              >
+                JS → Excel
+              </button>
+              <button id="btn-excel" onclick="switchDevMode('excel-to-js')">
+                Excel → JS
+              </button>
+            </div>
+
+            <!-- JS → Excel -->
+            <form id="form-dev-js">
               <div class="form-group">
-                <input type="file" name="file1" required />
+                <input type="file" name="file" accept=".js" required />
               </div>
 
-              <div class="form-group">
-                <input
-                  type="text"
-                  name="keyColumnFile1"
-                  placeholder="Key Column File 1"
-                />
-              </div>
-
-              <div class="form-group">
-                <input
-                  type="text"
-                  name="valueColumnFile1"
-                  placeholder="Value Column File 1"
-                />
-              </div>
-
-              <hr />
-
-              <div class="form-group">
-                <input type="file" name="file2" required />
-              </div>
-
-              <div class="form-group">
-                <input
-                  type="text"
-                  name="keyColumnFile2"
-                  placeholder="Key Column File 2"
-                />
-              </div>
-
-              <div class="form-group">
-                <input
-                  type="text"
-                  name="valueColumnFile2"
-                  placeholder="Value Column File 2"
-                />
-              </div>
-
-              <button id="button-cs" type="submit">Merge</button>
+              <button id="button-dev-js" type="submit">
+                Convert JS → Excel
+              </button>
             </form>
 
-            <div id="loading-cs" style="margin-top: 15px; display: none">
-              <div class="spinner"></div>
-              <div>Processing...</div>
-            </div>
-
-            <div id="result-cs" style="margin-top: 20px; display: none">
-              <p><strong>Download Link:</strong></p>
-              <a id="download-link-cs" href="#" target="_blank"></a>
-            </div>
-          </div>
-
-          <div class="cs-tab-content">
-            <h4>Generate Locales</h4>
-
-            <form id="form-cs-locales">
+            <!-- Excel → JS -->
+            <form id="form-dev-excel" style="display: none">
               <div class="form-group">
-                <input type="file" name="file" accept=".xlsx" required />
-              </div>
-
-              <div class="form-group">
-                <label
-                  >Worksheet Key - Worksheet that contain your key (default:
-                  worksheet 1)</label
-                >
                 <input
-                  type="text"
-                  name="workSheetKey"
-                  placeholder="Worksheet Key (default: 1)"
-                />
-              </div>
-
-              <div class="form-group">
-                <label
-                  >Key Column - The column specify the key in above worksheet
-                  (default: column 1)</label
-                >
-                <input
-                  type="text"
-                  name="keyColumn"
-                  placeholder="Key Column (default: 1)"
-                />
-              </div>
-
-              <div class="form-group">
-                <label
-                  >Worksheet Value - Worksheet that contain your values
-                  (default: worksheet 1)</label
-                >
-                <input
-                  type="text"
-                  name="workSheetValue"
-                  placeholder="Worksheet Value (default: 1)"
-                />
-              </div>
-
-              <div class="form-group">
-                <label
-                  >Value Columns - List oute your selects columns value,
-                  seperated by "," (e.g: 2,3,4)</label
-                >
-                <input
-                  type="text"
-                  name="valueColumns"
-                  placeholder="Value Columns (e.g: 2,3,4)"
+                  type="file"
+                  name="file"
+                  accept=".xlsx, .xls, .csv, .ods"
                   required
                 />
               </div>
 
-              <button id="button-cs-locales" type="submit">Generate ZIP</button>
+              <div class="form-group">
+                <input
+                  type="text"
+                  name="keyColumn"
+                  placeholder="Key Column (default 1)"
+                />
+              </div>
+
+              <div class="form-group">
+                <input
+                  type="text"
+                  name="valueColumn"
+                  placeholder="Value Column (default 2)"
+                />
+              </div>
+
+              <button id="button-dev-excel" type="submit">
+                Convert Excel → JS
+              </button>
             </form>
 
-            <div
-              id="loading-cs-locales"
-              style="margin-top: 15px; display: none"
-            >
+            <div id="loading-dev" style="margin-top: 15px; display: none">
               <div class="spinner"></div>
               <div>Processing...</div>
             </div>
 
-            <div id="result-cs-locales" style="margin-top: 20px; display: none">
+            <div id="result-dev" style="margin-top: 20px; display: none">
               <p><strong>Download Link:</strong></p>
-              <a id="download-link-cs-locales" href="#" target="_blank"></a>
+              <a id="download-link-dev" href="#" target="_blank"></a>
+            </div>
+          </div>
+
+          <div class="tab-content">
+            <h3>CS Tools</h3>
+
+            <div class="tabs">
+              <div class="cs-tab active" onclick="switchCsTab(0)">
+                Merge 2 files
+              </div>
+              <div class="cs-tab" onclick="switchCsTab(1)">
+                Generate Locales
+              </div>
+            </div>
+
+            <div class="cs-tab-content active">
+              <h4>Merge 2 files</h4>
+
+              <form id="form-cs">
+                <div class="form-group">
+                  <input type="file" name="file1" required />
+                </div>
+
+                <div class="form-group">
+                  <input
+                    type="text"
+                    name="keyColumnFile1"
+                    placeholder="Key Column File 1"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <input
+                    type="text"
+                    name="valueColumnFile1"
+                    placeholder="Value Column File 1"
+                  />
+                </div>
+
+                <hr />
+
+                <div class="form-group">
+                  <input type="file" name="file2" required />
+                </div>
+
+                <div class="form-group">
+                  <input
+                    type="text"
+                    name="keyColumnFile2"
+                    placeholder="Key Column File 2"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <input
+                    type="text"
+                    name="valueColumnFile2"
+                    placeholder="Value Column File 2"
+                  />
+                </div>
+
+                <button id="button-cs" type="submit">Merge</button>
+              </form>
+
+              <div id="loading-cs" style="margin-top: 15px; display: none">
+                <div class="spinner"></div>
+                <div>Processing...</div>
+              </div>
+
+              <div id="result-cs" style="margin-top: 20px; display: none">
+                <p><strong>Download Link:</strong></p>
+                <a id="download-link-cs" href="#" target="_blank"></a>
+              </div>
+            </div>
+
+            <div class="cs-tab-content">
+              <h4>Generate Locales</h4>
+
+              <form id="form-cs-locales">
+                <div class="form-group">
+                  <input
+                    type="file"
+                    name="file"
+                    accept=".xlsx, .xls, .csv, .ods"
+                    required
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label
+                    >Worksheet Key - Worksheet that contain your key (default:
+                    worksheet 1)</label
+                  >
+                  <input
+                    type="text"
+                    name="workSheetKey"
+                    placeholder="Worksheet Key (default: 1)"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label
+                    >Key Column - The column specify the key in above worksheet
+                    (default: column 1)</label
+                  >
+                  <input
+                    type="text"
+                    name="keyColumn"
+                    placeholder="Key Column (default: 1)"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label
+                    >Worksheet Value - Worksheet that contain your values
+                    (default: worksheet 1)</label
+                  >
+                  <input
+                    type="text"
+                    name="workSheetValue"
+                    placeholder="Worksheet Value (default: 1)"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label
+                    >Value Columns - List oute your selects columns value,
+                    seperated by "," (e.g: 2,3,4)</label
+                  >
+                  <input
+                    type="text"
+                    name="valueColumns"
+                    placeholder="Value Columns (e.g: 2,3,4)"
+                    required
+                  />
+                </div>
+
+                <button id="button-cs-locales" type="submit">
+                  Generate ZIP
+                </button>
+              </form>
+
+              <div
+                id="loading-cs-locales"
+                style="margin-top: 15px; display: none"
+              >
+                <div class="spinner"></div>
+                <div>Processing...</div>
+              </div>
+
+              <div
+                id="result-cs-locales"
+                style="margin-top: 20px; display: none"
+              >
+                <p><strong>Download Link:</strong></p>
+                <a id="download-link-cs-locales" href="#" target="_blank"></a>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- RIGHT -->
-      <div class="right-panel">
-        <h3>📊 Dashboard</h3>
+        <!-- RIGHT -->
+        <div class="right-panel">
+          <h3>📊 Dashboard</h3>
 
-        <div class="stat-card">
-          <div>👨🏻‍💻 Total Access</div>
-          <div id="total-access" class="stat-number">0</div>
-        </div>
+          <div class="stat-card">
+            <div>👨🏻‍💻 Total Access</div>
+            <div id="total-access" class="stat-number">0</div>
+          </div>
 
-        <div class="stat-card">
-          <div>🙋🏼‍♂️ Total Visitors</div>
-          <div id="visit-count" class="stat-number">0</div>
-        </div>
+          <div class="stat-card">
+            <div>🙋🏼‍♂️ Total Visitors</div>
+            <div id="visit-count" class="stat-number">0</div>
+          </div>
 
-        <div class="stat-card">
-          <div>📄 Upload JS → Excel</div>
-          <div id="upload-count" class="stat-number">0</div>
-        </div>
+          <div class="stat-card">
+            <div>📄 Upload JS → Excel</div>
+            <div id="upload-count" class="stat-number">0</div>
+          </div>
 
-        <div class="stat-card">
-          <div>📚 Excel → JS</div>
-          <div id="upload-excel-count" class="stat-number">0</div>
-        </div>
+          <div class="stat-card">
+            <div>📚 Excel → JS</div>
+            <div id="upload-excel-count" class="stat-number">0</div>
+          </div>
 
-        <div class="stat-card">
-          <div>📑 Merge Files</div>
-          <div id="merge-count" class="stat-number">0</div>
-        </div>
-        <div class="stat-card">
-          <div>🌎 Generate Locales</div>
-          <div id="generate-locales" class="stat-number">0</div>
+          <div class="stat-card">
+            <div>📑 Merge Files</div>
+            <div id="merge-count" class="stat-number">0</div>
+          </div>
+          <div class="stat-card">
+            <div>🌎 Generate Locales</div>
+            <div id="generate-locales" class="stat-number">0</div>
+          </div>
         </div>
       </div>
     </div>
 
     <script type="module">
-      import { init } from "/js/main.js";
-      init();
+      import { initAuth } from "/js/main.js";
+      window.onload = function () {
+        initAuth();
+      };
     </script>
   </body>
 </html>

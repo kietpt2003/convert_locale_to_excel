@@ -1,3 +1,115 @@
+let authToken = localStorage.getItem("app_token");
+
+async function fetchWithAuth(url, options = {}) {
+  const headers = {
+    ...options.headers,
+    Authorization: `Bearer ${authToken}`,
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401 || response.status === 403) {
+    localStorage.removeItem("app_token");
+    window.location.reload();
+  }
+
+  return response;
+}
+
+// ================= AUTHENTICATION =================
+export function initAuth() {
+  if (authToken) {
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("main-app").style.display = "block";
+
+    updateUserInfoUI(); //Update user info to UI
+
+    init();
+  } else {
+    google.accounts.id.initialize({
+      client_id:
+        "797919519685-raio24mb9u572jjc26o7mj7bsg8m4vrc.apps.googleusercontent.com",
+      callback: handleGoogleLogin,
+    });
+    google.accounts.id.renderButton(
+      document.getElementById("googleButtonDiv"),
+      { theme: "outline", size: "large" },
+    );
+  }
+}
+
+async function handleGoogleLogin(response) {
+  try {
+    const res = await fetch("/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: response.credential }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      authToken = data.token;
+      localStorage.setItem("app_token", authToken);
+
+      document.getElementById("login-screen").style.display = "none";
+      document.getElementById("main-app").style.display = "block";
+
+      updateUserInfoUI();
+
+      init();
+    } else {
+      alert("Login failed!");
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+export function signOut() {
+  const confirmLogout = confirm("Are you sure you want to sign out?");
+  if (confirmLogout) {
+    localStorage.removeItem("app_token");
+    window.location.reload();
+  }
+}
+
+function parseJwt(token) {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split("")
+        .map(function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join(""),
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
+
+function updateUserInfoUI() {
+  if (!authToken) return;
+
+  const user = parseJwt(authToken);
+  if (user) {
+    // Cập nhật Avatar
+    const avatarImg = document.getElementById("user-avatar");
+    if (user.picture) {
+      avatarImg.src = user.picture;
+      avatarImg.style.display = "block";
+    }
+
+    document.getElementById("user-name").textContent = user.name || "User";
+    document.getElementById("user-email").textContent = user.email || "";
+  }
+}
+
 // ================= TAB =================
 function switchTab(index) {
   const tabs = document.querySelectorAll(".tab");
@@ -77,7 +189,7 @@ export function animateCount(element, to) {
 // ================= API =================
 export async function loadVisits() {
   try {
-    const res = await fetch("/visits");
+    const res = await fetchWithAuth("/visits");
     const data = await res.json();
 
     const el = document.getElementById("visit-count");
@@ -129,14 +241,14 @@ function tabDev() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetch("/blob-token");
+        const resToken = await fetchWithAuth("/blob-token");
         const dataToken = await resToken.json();
 
         const url = await uploadFile(file, dataToken.token);
 
         button.textContent = "Processing...";
 
-        const res = await fetch("/upload", {
+        const res = await fetchWithAuth("/upload", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -146,6 +258,10 @@ function tabDev() {
 
         const data = await res.json();
 
+        if (!res.ok) {
+          throw new Error(data.message || "Please try again later");
+        }
+
         requestAnimationFrame(() => {
           link.href = data.url;
           link.textContent = data.url;
@@ -154,7 +270,7 @@ function tabDev() {
         });
         loadStats();
       } catch (err) {
-        alert("Something went wrong!");
+        alert(`❌ Error: ${err.message}`);
         console.error(err);
       } finally {
         loading.style.display = "none";
@@ -188,14 +304,14 @@ function tabDev() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetch("/blob-token");
+        const resToken = await fetchWithAuth("/blob-token");
         const dataToken = await resToken.json();
 
         const url = await uploadFile(file, dataToken.token);
 
         button.textContent = "Processing...";
 
-        const res = await fetch("/v2/upload-excel", {
+        const res = await fetchWithAuth("/v2/upload-excel", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -254,7 +370,7 @@ function tabCS() {
     button.textContent = "Uploading...";
 
     try {
-      const resToken = await fetch("/blob-token", {
+      const resToken = await fetchWithAuth("/blob-token", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -269,7 +385,7 @@ function tabCS() {
 
       button.textContent = "Processing...";
 
-      const res = await fetch("/upload-excel-merge-zip", {
+      const res = await fetchWithAuth("/upload-excel-merge-zip", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -286,6 +402,10 @@ function tabCS() {
 
       const data = await res.json();
 
+      if (!res.ok) {
+        throw new Error(data.message || "Please try again later");
+      }
+
       requestAnimationFrame(() => {
         link.href = data.url;
         link.textContent = data.url;
@@ -293,7 +413,7 @@ function tabCS() {
       });
       loadStats();
     } catch (err) {
-      alert("Something went wrong!");
+      alert(`❌ Error: ${err.message}`);
       console.error(err);
     } finally {
       loading.style.display = "none";
@@ -376,26 +496,29 @@ function tabCS() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetch("/blob-token");
+        const resToken = await fetchWithAuth("/blob-token");
         const dataToken = await resToken.json();
 
         const fileUrl = await uploadFile(file, dataToken.token);
 
         button.textContent = "Processing...";
 
-        const res = await fetch("/generate-excels-for-each-locales", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
+        const res = await fetchWithAuth(
+          "/v2/generate-excels-for-each-locales",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fileUrl,
+              workSheetKey: Number(workSheetKey),
+              keyColumn: Number(keyColumn),
+              workSheetValue: Number(workSheetValue),
+              valueColumns: parsedValueColumns,
+            }),
           },
-          body: JSON.stringify({
-            fileUrl,
-            workSheetKey: Number(workSheetKey),
-            keyColumn: Number(keyColumn),
-            workSheetValue: Number(workSheetValue),
-            valueColumns: parsedValueColumns,
-          }),
-        });
+        );
 
         const data = await res.json();
 
@@ -426,12 +549,14 @@ export async function loadStats() {
       { key: "merge-count", endpoint: "/upload-excel-merge-zip" },
       {
         key: "generate-locales",
-        endpoint: "/generate-excels-for-each-locales",
+        endpoint: "/v2/generate-excels-for-each-locales",
       },
     ];
 
     for (const item of endpoints) {
-      const res = await fetch(`api-usage/total?endpoint=${item.endpoint}`);
+      const res = await fetchWithAuth(
+        `api-usage/total?endpoint=${item.endpoint}`,
+      );
       const data = await res.json();
 
       const el = document.getElementById(item.key);
@@ -451,6 +576,8 @@ export function init() {
   window.switchDevMode = switchDevMode;
 
   window.switchCsTab = switchCsTab;
+
+  window.signOut = signOut;
 
   tabDev();
 
