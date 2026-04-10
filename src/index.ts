@@ -56,7 +56,6 @@ app.use(async (req, res, next) => {
 
       if (!exists) {
         await Visitor.create({ ip });
-        console.log("New visitor:", ip);
       }
     }
 
@@ -114,7 +113,6 @@ app.post("/auth/google", async (req: Request, res: Response) => {
       if (email === process.env.ADMIN_EMAIL) {
         authUser = await AuthorizedUser.create({ email, role: "admin" });
       } else {
-        console.log(`[Bảo mật] Chặn đăng nhập từ: ${email}`);
         return res.status(403).json({ message: "Access Denied. Please contact Admin for IT Support" });
       }
     }
@@ -729,7 +727,15 @@ app.post("/v2/generate-excels-for-each-locales", verifyToken, async (req: Reques
 app.get("/admin/users", verifyToken, verifyAdmin, async (req, res) => {
   try {
     const users = await AuthorizedUser.find().sort({ createdAt: -1 });
-    res.json(users);
+    const adminEmail = process.env.ADMIN_EMAIL;
+
+    const formattedUsers = users.map(u => ({
+      email: u.email,
+      role: u.email === adminEmail ? "super_admin" : u.role,
+      createdAt: u.createdAt
+    }));
+
+    res.json(formattedUsers);
   } catch (err) {
     res.status(500).json({ message: "Cannot get user list" });
   }
@@ -752,13 +758,27 @@ app.post("/admin/users", verifyToken, verifyAdmin, async (req, res) => {
 
 app.delete("/admin/users/:email", verifyToken, verifyAdmin, async (req, res) => {
   try {
-    const { email } = req.params;
+    const targetEmail = req.params.email;
+    const requesterEmail = (req as any).user.email;
 
-    if (email === process.env.ADMIN_EMAIL) {
+    if (targetEmail === process.env.ADMIN_EMAIL) {
       return res.status(400).json({ message: "Cannot delete Super Admin" });
     }
 
-    await AuthorizedUser.deleteOne({ email });
+    if (targetEmail === requesterEmail) {
+      return res.status(400).json({ message: "Cannot remove your permisison. Please contact Super Admin or IT Support!" });
+    }
+
+    const targetUser = await AuthorizedUser.findOne({ email: targetEmail });
+    if (!targetUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (targetUser.role === "admin" && requesterEmail !== process.env.ADMIN_EMAIL) {
+      return res.status(403).json({ message: "Only Super Admin can delete other admin!" });
+    }
+
+    await AuthorizedUser.deleteOne({ email: targetEmail });
     res.json({ message: "Delete user success" });
   } catch (err) {
     res.status(500).json({ message: "Delete user failed." });

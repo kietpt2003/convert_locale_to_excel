@@ -104,20 +104,16 @@ function updateUserInfoUI() {
       avatarImg.style.display = "block";
     }
 
-    // Hiển thị thêm chữ (Admin) nếu có quyền
     const roleText = user.role === "admin" ? " (Admin)" : "";
     document.getElementById("user-name").textContent =
       (user.name || "User") + roleText;
     document.getElementById("user-email").textContent = user.email || "";
 
-    // NẾU LÀ ADMIN -> HIỆN TAB QUẢN LÝ VÀ TẢI DANH SÁCH
     if (user.role === "admin") {
       document.getElementById("tab-admin").style.display = "block";
       loadAdminUsers();
 
-      // Gắn sự kiện submit cho form Add User
       const formAdd = document.getElementById("form-add-user");
-      // Tránh việc bị gán sự kiện nhiều lần nếu hàm này gọi lại
       formAdd.onsubmit = async (e) => {
         e.preventDefault();
         const email = e.target.email.value;
@@ -137,12 +133,12 @@ function updateUserInfoUI() {
 
           if (!res.ok) throw new Error(data.message);
 
-          e.target.reset(); // Xóa input
-          loadAdminUsers(); // Tải lại bảng
+          e.target.reset();
+          loadAdminUsers();
         } catch (err) {
           alert(`❌ Lỗi: ${err.message}`);
         } finally {
-          btn.textContent = "Cấp quyền";
+          btn.textContent = "Give access";
           btn.disabled = false;
         }
       };
@@ -634,9 +630,9 @@ export function init() {
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.message);
-      loadAdminUsers(); // Tải lại bảng
+      loadAdminUsers();
     } catch (e) {
-      alert(`❌ Lỗi: ${e.message}`);
+      alert(`❌ Error: ${e.message}`);
     }
   };
 
@@ -651,23 +647,47 @@ async function loadAdminUsers() {
     if (!res.ok) return;
     const users = await res.json();
 
+    const currentUser = parseJwt(authToken);
+    const currentUserEmail = currentUser.email;
+
+    const isCurrentUserSuperAdmin = users.some(
+      (u) => u.email === currentUserEmail && u.role === "super_admin",
+    );
+
     const tbody = document.getElementById("user-list-tbody");
     let html = "";
 
     users.forEach((u) => {
-      // Đổi màu badge quyền
-      const roleBadge =
-        u.role === "admin"
-          ? `<span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">ADMIN</span>`
-          : `<span style="background: #e3f2fd; color: #1565c0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">USER</span>`;
+      let roleBadge = "";
+      if (u.role === "super_admin") {
+        roleBadge = `<span style="background: #f3e5f5; color: #7b1fa2; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">SUPER ADMIN</span>`;
+      } else if (u.role === "admin") {
+        roleBadge = `<span style="background: #ffebee; color: #c62828; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">ADMIN</span>`;
+      } else {
+        roleBadge = `<span style="background: #e3f2fd; color: #1565c0; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">USER</span>`;
+      }
+
+      let showDeleteBtn = true;
+      let rejectReason = "";
+
+      if (u.role === "super_admin") {
+        showDeleteBtn = false;
+      } else if (u.email === currentUserEmail) {
+        showDeleteBtn = false;
+        rejectReason = "You";
+      } else if (!isCurrentUserSuperAdmin && u.role === "admin") {
+        showDeleteBtn = false;
+      }
+
+      const actionHtml = showDeleteBtn
+        ? `<button onclick="deleteAdminUser('${u.email}')" style="background: #ef4444; padding: 6px 12px; font-size: 12px; cursor: pointer;">Delete</button>`
+        : `<span style="color: #9ca3af; font-size: 12px; font-style: italic;">${rejectReason || ""}</span>`;
 
       html += `
         <tr>
           <td style="padding: 12px; border-bottom: 1px solid #eee;">${u.email}</td>
           <td style="padding: 12px; border-bottom: 1px solid #eee;">${roleBadge}</td>
-          <td style="padding: 12px; border-bottom: 1px solid #eee;">
-            <button onclick="deleteAdminUser('${u.email}')" style="background: #ef4444; padding: 6px 12px; font-size: 12px;">Xóa</button>
-          </td>
+          <td style="padding: 12px; border-bottom: 1px solid #eee;">${actionHtml}</td>
         </tr>
       `;
     });
