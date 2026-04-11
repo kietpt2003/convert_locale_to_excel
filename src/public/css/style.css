@@ -1,0 +1,519 @@
+/* ================= RESET & BASE ================= */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+  background: #f6f8fa;
+}
+
+/* ================= LAYOUT ================= */
+.container {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.left-panel {
+  flex: 2;
+}
+
+.right-panel {
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #eee;
+}
+
+/* ================= DEV HEADER ================= */
+.dev-header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.avatar-wrapper {
+  position: relative;
+}
+
+.developer-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid #4caf50;
+  object-fit: cover;
+}
+
+.verified-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  background: #4caf50;
+  border-radius: 50%;
+  border: 2px solid #fff;
+}
+
+.developer-name {
+  font-weight: bold;
+}
+
+.developer-links img {
+  margin-right: 6px;
+}
+
+/* ================= TABS ================= */
+.tabs {
+  display: flex;
+  margin-top: 20px;
+}
+
+.tab,
+.cs-tab {
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  background: #f1f1f1;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.tab.active,
+.cs-tab.active {
+  background: #fff;
+  font-weight: bold;
+  border-bottom: 1px solid #fff;
+}
+
+.tab-content,
+.cs-tab-content {
+  border: 1px solid #ddd;
+  padding: 20px;
+  background: #fff;
+  display: none;
+}
+
+.tab-content.active,
+.cs-tab-content.active {
+  display: block;
+}
+
+/* ================= FORMS & BUTTONS ================= */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.form-group input,
+select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  transition: 0.2s;
+}
+
+.form-group input:focus,
+select:focus {
+  border-color: #4caf50;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.15);
+}
+
+button {
+  padding: 10px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #4caf50;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.dev-mode-buttons {
+  margin-bottom: 12px;
+}
+
+.dev-mode-buttons button {
+  background: #eee;
+  color: #333;
+  margin-right: 6px;
+}
+
+.dev-mode-buttons button.active {
+  background: #4caf50;
+  color: #fff;
+}
+
+/* ================= RESULTS & SPINNER ================= */
+#result-dev,
+#result-cs,
+#result-cs-locales {
+  margin-top: 20px;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 4px solid #ddd;
+  border-top: 4px solid #4caf50;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 10px auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ================= DASHBOARD ================= */
+.stat-card {
+  background: #f9fafb;
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 12px;
+  border: 1px solid #eee;
+  transition: all 0.3s ease; /* Thêm dòng này */
+}
+
+.stat-card:hover {
+  background: #fff;
+  border-color: #4caf50;
+  box-shadow: 0 8px 20px rgba(76, 175, 80, 0.1);
+  transform: translateY(-3px); /* Nhảy nhẹ lên */
+}
+
+.stat-number {
+  font-size: 26px;
+  font-weight: bold;
+  margin-top: 6px;
+  color: #111827;
+  transition: color 0.3s ease;
+}
+
+.stat-card:hover .stat-number {
+  color: #4caf50;
+}
+
+/* ================= LOGIN CARD ================= */
+#login-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(-45deg, #a1c4fd, #c2e9fb, #e0c3fc, #8ec5fc);
+  background-size: 400% 400%;
+  animation: gradientBG 15s ease infinite;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+@keyframes gradientBG {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.login-card {
+  /* Nền trắng hơi trong suốt (Glassmorphism) */
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 40px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  max-width: 420px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateY(0);
+  transition: transform 0.3s ease;
+}
+
+.login-card:hover {
+  transform: translateY(-5px); /* Trôi nhẹ lên khi rê chuột */
+}
+
+#main-app {
+  display: none;
+}
+
+.login-card .avatar-wrapper {
+  margin-bottom: 12px;
+}
+
+.login-card .developer-name {
+  font-size: 20px;
+  color: #1f2937;
+}
+
+.login-card h2 {
+  margin: 24px 0 8px 0;
+  font-size: 22px;
+  color: #111827;
+}
+
+.login-card p {
+  color: #6b7280;
+  margin-bottom: 24px;
+  font-size: 15px;
+}
+
+.login-card .developer-links {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* ================= MAIN HEADER (LOGGED IN) ================= */
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.btn-signout {
+  background: #ef4444;
+  color: white;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.btn-signout:hover {
+  background: #dc2626;
+}
+
+/* ================= BUY ME A COFFEE POPUP ================= */
+.popup-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  animation: fadeIn 0.3s ease;
+}
+
+.popup-content {
+  background: #fff;
+  padding: 30px;
+  border-radius: 16px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+.close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: transparent !important;
+  color: #888 !important;
+  font-size: 24px;
+  padding: 0 !important;
+  line-height: 1;
+  width: auto;
+}
+.close-btn:hover {
+  color: #333 !important;
+}
+
+.popup-content h3 {
+  margin: 0 0 10px 0;
+  color: #f59e0b;
+  font-size: 22px;
+}
+
+.popup-content p.subtitle {
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.donate-tabs {
+  display: flex;
+  margin-bottom: 16px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.d-tab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: 0.2s;
+}
+
+.d-tab.active {
+  background: #fff;
+  color: #1976d2;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.d-tab-content {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.d-tab-content.active {
+  display: block;
+}
+
+.qr-wrapper {
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 12px;
+  border: 2px dashed #e5e7eb;
+}
+
+/* Ép tỉ lệ 3:4 cho QR */
+.qr-img-3-4 {
+  width: 100%;
+  max-width: 210px;
+  aspect-ratio: 3 / 4;
+  object-fit: contain; /* Hoặc 'cover' tùy thuộc vào ảnh gốc của bạn */
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto;
+}
+
+.bank-details-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 12px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.bank-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #334155;
+}
+
+.bank-row .b-label {
+  color: #64748b;
+}
+
+.btn-copy {
+  background: #e2e8f0;
+  color: #334155;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.btn-copy:hover {
+  background: #cbd5e1;
+}
+
+.thanks-btn {
+  background: #f3f4f6 !important;
+  color: #4b5563 !important;
+  width: 100%;
+  margin-top: 10px;
+}
+.thanks-btn:hover {
+  background: #e5e7eb !important;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.announcement-bar {
+  background: linear-gradient(90deg, #1976d2, #4caf50);
+  color: white;
+  padding: 10px 0;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 15px rgba(25, 118, 210, 0.2);
+  white-space: nowrap;
+  position: relative;
+}
+
+.marquee {
+  display: inline-block;
+  animation: marquee 20s linear infinite;
+  font-size: 14px;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(100vw);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}

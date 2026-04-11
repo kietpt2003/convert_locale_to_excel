@@ -6,295 +6,66 @@
 
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-    <style>
-      * {
-        box-sizing: border-box;
-      }
-
-      .login-card {
-        background: #fff;
-        padding: 40px;
-        border-radius: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-        text-align: center;
-        max-width: 420px;
-        width: 90%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-
-      .login-card .avatar-wrapper {
-        margin-bottom: 12px;
-      }
-
-      .login-card .developer-name {
-        font-size: 20px;
-        color: #1f2937;
-      }
-
-      .login-card h2 {
-        margin: 24px 0 8px 0;
-        font-size: 22px;
-        color: #111827;
-      }
-
-      .login-card p {
-        color: #6b7280;
-        margin-bottom: 24px;
-        font-size: 15px;
-      }
-
-      .login-card .developer-links {
-        margin-top: 12px;
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-      }
-
-      /* ================= HEADER BỐ CỤC MỚI ================= */
-      .main-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        margin-bottom: 20px;
-      }
-
-      .btn-signout {
-        background: #ef4444; /* Màu đỏ */
-        color: white;
-        padding: 8px 16px;
-        font-size: 14px;
-      }
-
-      .btn-signout:hover {
-        background: #dc2626;
-      }
-
-      #login-screen {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: #f6f8fa;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-      }
-      #main-app {
-        display: none;
-      }
-
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        padding: 20px;
-        background: #f6f8fa;
-      }
-
-      /* LAYOUT */
-      .container {
-        display: flex;
-        gap: 24px;
-        align-items: flex-start;
-      }
-
-      .left-panel {
-        flex: 2;
-      }
-
-      .right-panel {
-        flex: 1;
-        background: #fff;
-        border-radius: 12px;
-        padding: 20px;
-        border: 1px solid #eee;
-      }
-
-      /* DEV HEADER */
-      .dev-header {
-        display: flex;
-        gap: 16px;
-        align-items: center;
-        margin-bottom: 20px;
-      }
-
-      .avatar-wrapper {
-        position: relative;
-      }
-
-      .developer-avatar {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        border: 3px solid #4caf50;
-        object-fit: cover;
-      }
-
-      .verified-badge {
-        position: absolute;
-        bottom: 4px;
-        right: 4px;
-        width: 14px;
-        height: 14px;
-        background: #4caf50;
-        border-radius: 50%;
-        border: 2px solid #fff;
-      }
-
-      .developer-name {
-        font-weight: bold;
-      }
-
-      .developer-links img {
-        margin-right: 6px;
-      }
-
-      /* TABS */
-      .tabs {
-        display: flex;
-        margin-top: 20px;
-      }
-
-      .tab,
-      .cs-tab {
-        padding: 10px 16px;
-        border: 1px solid #ddd;
-        background: #f1f1f1;
-        cursor: pointer;
-        transition: 0.2s;
-      }
-
-      .tab.active,
-      .cs-tab.active {
-        background: #fff;
-        font-weight: bold;
-        border-bottom: 1px solid #fff;
-      }
-
-      /* CONTENT */
-      .tab-content,
-      .cs-tab-content {
-        border: 1px solid #ddd;
-        padding: 20px;
-        background: #fff;
-        display: none;
-      }
-
-      .tab-content.active,
-      .cs-tab-content.active {
-        display: block;
-      }
-
-      /* FORM */
-      .form-group {
-        margin-bottom: 14px;
-      }
-
-      .form-group label {
-        display: block;
-        font-size: 13px;
-        font-weight: 600;
-        margin-bottom: 6px;
-      }
-
-      .form-group input {
-        width: 100%;
-        padding: 8px 10px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        transition: 0.2s;
-      }
-
-      .form-group input:focus {
-        border-color: #4caf50;
-        outline: none;
-        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.15);
-      }
-
-      /* BUTTON */
-      button {
-        padding: 10px 14px;
-        border-radius: 6px;
-        border: none;
-        background: #4caf50;
-        color: #fff;
-        font-weight: 600;
-        cursor: pointer;
-        transition: 0.2s;
-      }
-
-      button:hover {
-        opacity: 0.9;
-      }
-
-      button:disabled {
-        background: #ccc;
-        cursor: not-allowed;
-      }
-
-      /* DEV MODE BUTTON */
-      .dev-mode-buttons {
-        margin-bottom: 12px;
-      }
-
-      .dev-mode-buttons button {
-        background: #eee;
-        color: #333;
-        margin-right: 6px;
-      }
-
-      .dev-mode-buttons button.active {
-        background: #4caf50;
-        color: #fff;
-      }
-
-      /* RESULT */
-      #result-dev,
-      #result-cs,
-      #result-cs-locales {
-        margin-top: 20px;
-      }
-
-      /* SPINNER */
-      .spinner {
-        width: 28px;
-        height: 28px;
-        border: 4px solid #ddd;
-        border-top: 4px solid #4caf50;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 10px auto;
-      }
-
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-
-      /* DASHBOARD */
-      .stat-card {
-        background: #f9fafb;
-        border-radius: 10px;
-        padding: 16px;
-        text-align: center;
-        margin-bottom: 12px;
-        border: 1px solid #eee;
-      }
-
-      .stat-number {
-        font-size: 26px;
-        font-weight: bold;
-        margin-top: 6px;
-      }
-    </style>
+    <link rel="stylesheet" href="/css/style.css" />
   </head>
 
   <body>
+    <div id="donation-popup" class="popup-overlay" style="display: none">
+      <div class="popup-content">
+        <button class="close-btn" onclick="closePopup()">&times;</button>
+
+        <h3>☕ Buy me a coffee</h3>
+        <p class="subtitle">
+          If you find this tool a time-saving tool, please treat me to a cup of
+          coffee!
+        </p>
+
+        <div class="donate-tabs">
+          <div class="d-tab active" onclick="switchDonateTab('momo')">
+            MoMo Wallet
+          </div>
+          <div class="d-tab" onclick="switchDonateTab('bank')">
+            Bank Transfer
+          </div>
+        </div>
+
+        <div id="tab-momo" class="d-tab-content active">
+          <div class="qr-wrapper">
+            <img src="assets/momo_qr.JPG" alt="Momo QR" class="qr-img-3-4" />
+          </div>
+          <div style="font-size: 14px; color: #6b7280; margin-top: 8px">
+            Scan the code via the MoMo app or your bank's app.
+          </div>
+        </div>
+
+        <div id="tab-bank" class="d-tab-content">
+          <div class="qr-wrapper">
+            <img src="assets/bank_qr.JPG" alt="Bank QR" class="qr-img-3-4" />
+          </div>
+
+          <div class="bank-details-box">
+            <div class="bank-row">
+              <span class="b-label">Bank branch:</span>
+              <strong>TPBANK BINH THANH</strong>
+            </div>
+            <div class="bank-row">
+              <span class="b-label">Account holder:</span>
+              <strong>PHẠM TUẤN KIỆT</strong>
+            </div>
+            <div class="bank-row" style="margin-bottom: 0; align-items: center">
+              <span class="b-label">Account number:</span>
+              <div style="display: flex; gap: 8px; align-items: center">
+                <strong id="stk-text">05667788001</strong>
+                <button class="btn-copy" onclick="copySTK()">Copy</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button class="thanks-btn" onclick="closePopup()">Maybe later</button>
+      </div>
+    </div>
+
     <div id="login-screen">
       <div class="login-card">
         <h2>Key Generator Tool</h2>
@@ -329,6 +100,28 @@
     </div>
 
     <div id="main-app">
+      <div class="announcement-bar">
+        <div class="marquee">
+          <span>
+            🚀 If the Key Generator Tool has been valuable to your workflow and
+            saved you time, please consider supporting the developer.
+            <a
+              href="javascript:void(0)"
+              onclick="openDonationPopup()"
+              style="
+                color: #ffeb3b;
+                text-decoration: underline;
+                font-weight: bold;
+                padding: 0 5px;
+                cursor: pointer;
+              "
+            >
+              ☕ Buy me a Coffee
+            </a>
+            Your generosity is deeply appreciated! ❤️
+          </span>
+        </div>
+      </div>
       <div class="container">
         <div class="left-panel">
           <div class="main-header">
@@ -722,8 +515,59 @@
 
     <script type="module">
       import { initAuth } from "/js/main.js";
+
+      window.closePopup = function () {
+        document.getElementById("donation-popup").style.display = "none";
+      };
+
+      window.openDonationPopup = function () {
+        document.getElementById("donation-popup").style.display = "flex";
+      };
+
+      window.switchDonateTab = function (tabId) {
+        document
+          .querySelectorAll(".d-tab")
+          .forEach((t) => t.classList.remove("active"));
+        document
+          .querySelectorAll(".d-tab-content")
+          .forEach((c) => c.classList.remove("active"));
+
+        event.currentTarget.classList.add("active");
+        document.getElementById(`tab-${tabId}`).classList.add("active");
+      };
+
+      // Copy STK
+      window.copySTK = function () {
+        const stk = document.getElementById("stk-text").innerText;
+        navigator.clipboard.writeText(stk).then(() => {
+          const btn = event.currentTarget;
+          const originalText = btn.innerText;
+          btn.innerText = "Copied!";
+          btn.style.background = "#4caf50";
+          btn.style.color = "#fff";
+
+          setTimeout(() => {
+            btn.innerText = originalText;
+            btn.style.background = "#e2e8f0";
+            btn.style.color = "#334155";
+          }, 2000);
+        });
+      };
+
+      function showDonationPopup() {
+        const popup = document.getElementById("donation-popup");
+        const lastShownTime = localStorage.getItem("donation_popup_time");
+        const now = new Date().getTime();
+
+        if (!lastShownTime || now - parseInt(lastShownTime) > 86400000) {
+          popup.style.display = "flex";
+          localStorage.setItem("donation_popup_time", now.toString());
+        }
+      }
+
       window.onload = function () {
         initAuth();
+        showDonationPopup();
       };
     </script>
   </body>
