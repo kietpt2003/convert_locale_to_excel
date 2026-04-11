@@ -329,6 +329,7 @@ function tabDev() {
       }
     });
 
+  // ================= EXCEL -> JS =================
   document
     .getElementById("form-dev-excel")
     .addEventListener("submit", async (e) => {
@@ -390,6 +391,66 @@ function tabDev() {
         button.textContent = "Convert Excel → JS";
       }
     });
+
+  // ================= DIFF CHECKER (COMPARE 2 JS FILES) =================
+  const formDiffJs = document.getElementById("form-dev-diff-js");
+  if (formDiffJs) {
+    formDiffJs.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const fileOld = form.querySelector('input[name="fileOld"]').files[0];
+      const fileNew = form.querySelector('input[name="fileNew"]').files[0];
+
+      const resultDiv = document.getElementById("result-dev");
+      const link = document.getElementById("download-link-dev");
+      const loading = document.getElementById("loading-dev");
+      const button = document.getElementById("button-dev-diff-js");
+
+      link.href = "";
+      link.textContent = "";
+      resultDiv.style.display = "none";
+      loading.style.display = "block";
+      button.disabled = true;
+      button.textContent = "Uploading...";
+
+      try {
+        const resToken = await fetchWithAuth("/blob-token");
+        const dataToken = await resToken.json();
+
+        // Tải 2 file JS lên Vercel Blob cùng lúc
+        const [oldUrl, newUrl] = await Promise.all([
+          uploadFile(fileOld, dataToken.token),
+          uploadFile(fileNew, dataToken.token),
+        ]);
+
+        button.textContent = "Comparing...";
+
+        // Gọi API Diff JS
+        const res = await fetchWithAuth("/diff-js", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldFileUrl: oldUrl, newFileUrl: newUrl }),
+        });
+
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.message || "Failed to compare JS files");
+
+        requestAnimationFrame(() => {
+          link.href = data.url;
+          link.textContent = "Download Diff Report (Excel)";
+          resultDiv.style.display = "block";
+        });
+        loadStats(); // Cập nhật số liệu trên Dashboard
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      } finally {
+        loading.style.display = "none";
+        button.disabled = false;
+        button.textContent = "Compare JS Files";
+      }
+    });
+  }
 
   document
     .getElementById("form-dev-translate-js")
