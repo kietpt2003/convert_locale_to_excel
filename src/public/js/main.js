@@ -159,37 +159,47 @@ function switchTab(index) {
 
 // ================= DEV MODE =================
 function switchDevMode(mode) {
-  const resultDiv = document.getElementById("result-dev");
-  const link = document.getElementById("download-link-dev");
-  link.href = "";
-  link.textContent = "";
-  resultDiv.style.display = "none";
+  window.switchDevMode = function (mode) {
+    const resultDiv = document.getElementById("result-dev");
+    const link = document.getElementById("download-link-dev");
+    link.href = "";
+    link.textContent = "";
+    resultDiv.style.display = "none";
 
-  const formJs = document.getElementById("form-dev-js");
-  const formExcel = document.getElementById("form-dev-excel");
-  const formDiffJs = document.getElementById("form-dev-diff-js");
+    const formJs = document.getElementById("form-dev-js");
+    const formExcel = document.getElementById("form-dev-excel");
+    const formDiffJs = document.getElementById("form-dev-diff-js");
+    const formTransJs = document.getElementById("form-dev-translate-js");
 
-  const btnJs = document.getElementById("btn-js");
-  const btnExcel = document.getElementById("btn-excel");
-  const btnDiffJs = document.getElementById("btn-diff-js");
+    const btnJs = document.getElementById("btn-js");
+    const btnExcel = document.getElementById("btn-excel");
+    const btnDiffJs = document.getElementById("btn-diff-js");
+    const btnTransJs = document.getElementById("btn-translate-js");
 
-  formJs.style.display = "none";
-  formExcel.style.display = "none";
-  formDiffJs.style.display = "none";
-  btnJs.classList.remove("active");
-  btnExcel.classList.remove("active");
-  btnDiffJs.classList.remove("active");
+    formJs.style.display = "none";
+    formExcel.style.display = "none";
+    formDiffJs.style.display = "none";
+    formTransJs.style.display = "none";
 
-  if (mode === "js-to-excel") {
-    formJs.style.display = "block";
-    btnJs.classList.add("active");
-  } else if (mode === "excel-to-js") {
-    formExcel.style.display = "block";
-    btnExcel.classList.add("active");
-  } else if (mode === "diff-js") {
-    formDiffJs.style.display = "block";
-    btnDiffJs.classList.add("active");
-  }
+    btnJs.classList.remove("active");
+    btnExcel.classList.remove("active");
+    btnDiffJs.classList.remove("active");
+    btnTransJs.classList.remove("active");
+
+    if (mode === "js-to-excel") {
+      formJs.style.display = "block";
+      btnJs.classList.add("active");
+    } else if (mode === "excel-to-js") {
+      formExcel.style.display = "block";
+      btnExcel.classList.add("active");
+    } else if (mode === "diff-js") {
+      formDiffJs.style.display = "block";
+      btnDiffJs.classList.add("active");
+    } else if (mode === "translate-js") {
+      formTransJs.style.display = "block";
+      btnTransJs.classList.add("active");
+    }
+  };
 }
 
 function switchCsTab(index) {
@@ -258,22 +268,24 @@ export async function uploadFile(file, token) {
 }
 
 function tabDev() {
+  // ================= JS -> EXCEL =================
   document
-    .getElementById("form-dev-diff-js")
+    .getElementById("form-dev-js")
     ?.addEventListener("submit", async (e) => {
       e.preventDefault();
+
       const form = e.target;
-      const fileOld = form.querySelector('input[name="fileOld"]').files[0];
-      const fileNew = form.querySelector('input[name="fileNew"]').files[0];
+      const file = form.querySelector('input[name="file"]').files[0];
 
       const resultDiv = document.getElementById("result-dev");
       const link = document.getElementById("download-link-dev");
       const loading = document.getElementById("loading-dev");
-      const button = document.getElementById("button-dev-diff-js");
+      const button = document.getElementById("button-dev-js");
 
       link.href = "";
       link.textContent = "";
       resultDiv.style.display = "none";
+
       loading.style.display = "block";
       button.disabled = true;
       button.textContent = "Uploading...";
@@ -282,35 +294,38 @@ function tabDev() {
         const resToken = await fetchWithAuth("/blob-token");
         const dataToken = await resToken.json();
 
-        const [oldUrl, newUrl] = await Promise.all([
-          uploadFile(fileOld, dataToken.token),
-          uploadFile(fileNew, dataToken.token),
-        ]);
+        const url = await uploadFile(file, dataToken.token);
 
-        button.textContent = "Comparing...";
+        button.textContent = "Processing...";
 
-        const res = await fetchWithAuth("/diff-js", {
+        const res = await fetchWithAuth("/upload", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ oldFileUrl: oldUrl, newFileUrl: newUrl }),
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            fileUrl: url,
+          }),
         });
 
         const data = await res.json();
+
         if (!res.ok)
-          throw new Error(data.message || "Failed to compare JS files");
+          throw new Error(data.message || "Failed to convert JS to Excel");
 
         requestAnimationFrame(() => {
           link.href = data.url;
-          link.textContent = "Download Diff Report";
+          link.textContent = "Download Excel File";
           resultDiv.style.display = "block";
         });
         loadStats();
       } catch (err) {
         alert(`❌ Error: ${err.message}`);
+        console.error(err);
       } finally {
         loading.style.display = "none";
         button.disabled = false;
-        button.textContent = "Compare JS Files";
+        button.textContent = "Convert JS → Excel";
       }
     });
 
@@ -373,6 +388,69 @@ function tabDev() {
         loading.style.display = "none";
         button.disabled = false;
         button.textContent = "Convert Excel → JS";
+      }
+    });
+
+  document
+    .getElementById("form-dev-translate-js")
+    ?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const fileOriginal = form.querySelector('input[name="fileOriginal"]')
+        .files[0];
+
+      // Select all checked checkbox
+      const checkboxes = form.querySelectorAll(
+        'input[name="targetLangs"]:checked',
+      );
+      const targetLangs = Array.from(checkboxes).map((cb) => cb.value);
+
+      if (targetLangs.length === 0) {
+        alert("⚠️ Please select at least one target language.");
+        return;
+      }
+
+      const resultDiv = document.getElementById("result-dev");
+      const link = document.getElementById("download-link-dev");
+      const loading = document.getElementById("loading-dev");
+      const button = document.getElementById("button-dev-translate-js");
+
+      link.href = "";
+      link.textContent = "";
+      resultDiv.style.display = "none";
+      loading.style.display = "block";
+      button.disabled = true;
+      button.textContent = "Uploading...";
+
+      try {
+        const resToken = await fetchWithAuth("/blob-token");
+        const dataToken = await resToken.json();
+
+        const fileUrl = await uploadFile(fileOriginal, dataToken.token);
+        button.textContent = "Translating...";
+
+        const res = await fetchWithAuth("/translate-js", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileUrl, targetLangs }),
+        });
+
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.message || "Failed to translate JS file");
+
+        requestAnimationFrame(() => {
+          link.href = data.url;
+          link.textContent = `Download Translated JS (${data.totalTranslated} keys)`;
+          resultDiv.style.display = "block";
+        });
+        loadStats();
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      } finally {
+        loading.style.display = "none";
+        button.disabled = false;
+        button.textContent = "Translate JS File";
       }
     });
 }
@@ -641,6 +719,78 @@ function tabCS() {
         button.textContent = "Check Differences";
       }
     });
+
+  document
+    .getElementById("form-cs-translate")
+    ?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const fileOriginal = form.querySelector('input[name="fileOriginal"]')
+        .files[0];
+
+      // Select all checked checkbox
+      const checkboxes = form.querySelectorAll(
+        'input[name="targetLangs"]:checked',
+      );
+      const targetLangs = Array.from(checkboxes).map((cb) => cb.value);
+
+      if (targetLangs.length === 0) {
+        alert("⚠️ Please select at least one target language.");
+        return;
+      }
+
+      const keyColumn = form.keyColumn.value || 1;
+      const valueColumn = form.valueColumn.value || 2;
+
+      const resultDiv = document.getElementById("result-cs-translate");
+      const link = document.getElementById("download-link-cs-translate");
+      const loading = document.getElementById("loading-cs-translate");
+      const button = document.getElementById("button-cs-translate");
+
+      link.href = "";
+      link.textContent = "";
+      resultDiv.style.display = "none";
+      loading.style.display = "block";
+      button.disabled = true;
+      button.textContent = "Uploading...";
+
+      try {
+        const resToken = await fetchWithAuth("/blob-token");
+        const dataToken = await resToken.json();
+
+        const fileUrl = await uploadFile(fileOriginal, dataToken.token);
+
+        button.textContent = `Translating ${targetLangs.length} languages...`;
+
+        const res = await fetchWithAuth("/translate-excel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileUrl,
+            targetLangs,
+            keyColumn,
+            valueColumn,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.message || "Failed to translate file");
+
+        requestAnimationFrame(() => {
+          link.href = data.url;
+          link.textContent = `Download Translated File (${data.totalTranslated} keys, ${data.languages.length} languages)`;
+          resultDiv.style.display = "block";
+        });
+        loadStats();
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      } finally {
+        loading.style.display = "none";
+        button.disabled = false;
+        button.textContent = "Translate Now";
+      }
+    });
 }
 
 export async function loadStats() {
@@ -656,6 +806,8 @@ export async function loadStats() {
       },
       { key: "diff-js-count", endpoint: "/diff-js" },
       { key: "diff-excel-count", endpoint: "/diff-excel" },
+      { key: "translate-excel-count", endpoint: "/translate-excel" },
+      { key: "translate-js-count", endpoint: "/translate-js" },
     ];
 
     for (const item of endpoints) {

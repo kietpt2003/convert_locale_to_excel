@@ -12,6 +12,8 @@ import mongoose from "mongoose";
 import * as XLSX from "xlsx";
 import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
+import translate from "translate-google";
+import { isHtml } from "cheerio/utils";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -21,8 +23,11 @@ import generateDuplicateExcel from "./utils/generateDuplicateExcel.js";
 import { Visitor } from "./models/Visitors.js";
 import { ApiUsage } from "./models/ApiUsage.js";
 import { AuthorizedUser } from "./models/AuthorizedUser.js";
+import { Language } from "./models/Language.js";
 import { shouldTrackEndpoint } from "./utils/shouldTrackEndpoint.js";
 import { verifyToken, verifyAdmin } from "./middleware/validation.js";
+import translateComplexHtml from "./utils/translateComplexHtml.js";
+import delay from "./utils/delay.js";
 
 const app = express();
 const PORT = 3000;
@@ -802,14 +807,12 @@ app.post("/diff-js", verifyToken, async (req: Request, res: Response) => {
     const oldBuffer = Buffer.from(await oldRes.arrayBuffer());
     const newBuffer = Buffer.from(await newRes.arrayBuffer());
 
-    // Đọc nội dung 2 file JS
     const oldData: Record<string, string> = eval(wrapJsFileContent(oldBuffer.toString("utf-8")));
     const newData: Record<string, string> = eval(wrapJsFileContent(newBuffer.toString("utf-8")));
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Diff Report");
 
-    // Khởi tạo Header bằng Tiếng Anh
     sheet.columns = [
       { header: "Key", key: "key", width: 40 },
       { header: "Old Value", key: "oldValue", width: 50 },
@@ -823,7 +826,7 @@ app.post("/diff-js", verifyToken, async (req: Request, res: Response) => {
       const oldVal = oldData[key];
       const newVal = newData[key];
       let status = "";
-      let color = ""; // Mã màu ARGB cho background cell
+      let color = "";
 
       if (oldVal === undefined && newVal !== undefined) {
         status = "Added";
@@ -846,7 +849,6 @@ app.post("/diff-js", verifyToken, async (req: Request, res: Response) => {
         status: status,
       });
 
-      // Tô màu dòng
       if (color !== "FFFFFFFF") {
         row.eachCell((cell) => {
           cell.fill = {
@@ -895,7 +897,6 @@ app.post("/diff-excel", verifyToken, async (req: Request, res: Response) => {
     const oldBuffer = Buffer.from(await oldRes.arrayBuffer());
     const newBuffer = Buffer.from(await newRes.arrayBuffer());
 
-    // Đọc nội dung 2 file Excel
     const oldData = await parseExcelToObject(oldBuffer, Number(keyColumnOld), Number(valueColumnOld));
     const newData = await parseExcelToObject(newBuffer, Number(keyColumnNew), Number(valueColumnNew));
 
@@ -949,6 +950,257 @@ app.post("/diff-excel", verifyToken, async (req: Request, res: Response) => {
   } catch (err) {
     console.error("Diff Excel Error:", err);
     return res.status(500).json({ message: "An error occurred while generating the Excel diff report." });
+  }
+});
+
+// ================= AUTO TRANSLATE (EXCEL) - MULTI LANGUAGES =================
+app.post("/translate-excel", verifyToken, async (req: Request, res: Response) => {
+  try {
+    // Đổi targetLang thành mảng targetLangs
+    const { fileUrl, targetLangs, keyColumn = 1, valueColumn = 2 } = req.body;
+
+    if (!fileUrl || !targetLangs || !Array.isArray(targetLangs) || targetLangs.length === 0) {
+      return res.status(400).json({ message: "Please provide a file URL and at least one target language." });
+    }
+
+    const fileRes = await fetch(fileUrl);
+    if (!fileRes.ok) {
+      return res.status(400).json({ message: "Cannot fetch the file from storage." });
+    }
+
+    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+    const data = await parseExcelToObject(fileBuffer, Number(keyColumn), Number(valueColumn));
+
+    const keys = Object.keys(data);
+    const originalValues = Object.values(data);
+
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    const isHtml = (str: string) => /<\/?(html|body|div|p|h[1-6]|span|a|ul|li|table|tr|td|br|strong|b|em|i)[^>]*>/i.test(str);
+
+    // =========================================================================
+    // Object save result of each languages (VD: { 'vi': [...], 'fr': [...] })
+    // =========================================================================
+    const translationsByLang: Record<string, string[]> = {};
+    for (const lang of targetLangs) {
+      console.log(`\n🌍 STARTING TRANSLATION FOR LANGUAGE: ${lang.toUpperCase()}`);
+      let currentLangTranslations: string[] = new Array(originalValues.length).fill("");
+      const plainTextBatch: { index: number; text: string }[] = [];
+
+      for (let i = 0; i < originalValues.length; i++) {
+        const str = (originalValues[i] === null || originalValues[i] === undefined) ? "" : String(originalValues[i]);
+
+        if (isHtml(str)) {
+          const htmlRes = await translateComplexHtml(str, lang);
+          currentLangTranslations[i] = htmlRes;
+        } else {
+          currentLangTranslations[i] = str;
+          if (str.trim()) {
+            plainTextBatch.push({ index: i, text: str });
+          }
+        }
+      }
+
+      console.log(`🚀 Translating ${plainTextBatch.length} plain text items to ${lang}...`);
+      for (let i = 0; i < plainTextBatch.length; i += 30) {
+        const batch = plainTextBatch.slice(i, i + 30);
+        const textsToTranslate = batch.map(b => b.text);
+
+        try {
+          const res = await translate(textsToTranslate, { to: lang });
+          batch.forEach((b, idx) => {
+            currentLangTranslations[b.index] = res[idx];
+          });
+          await delay(2000);
+        } catch (err) {
+          console.warn(`⚠️ Chunk failed. Falling back to 1-by-1 for lang ${lang}...`);
+          for (const b of batch) {
+            try {
+              const singleRes = await translate(b.text, { to: lang });
+              currentLangTranslations[b.index] = singleRes;
+              await delay(1000);
+            } catch (e) {
+              // Lỗi thì giữ nguyên bản gốc
+            }
+          }
+        }
+      }
+
+      translationsByLang[lang] = currentLangTranslations;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Translations");
+
+    const columns = [
+      { header: "Key", key: "key", width: 35 },
+      { header: "Original Value", key: "original", width: 45 },
+    ];
+
+    targetLangs.forEach((lang: string) => {
+      columns.push({ header: `Translated (${lang})`, key: lang, width: 45 });
+    });
+    sheet.columns = columns;
+
+    keys.forEach((key, index) => {
+      const rowData: any = {
+        key: key,
+        original: originalValues[index],
+      };
+      targetLangs.forEach((lang: string) => {
+        rowData[lang] = translationsByLang[lang][index];
+      });
+      sheet.addRow(rowData);
+    });
+
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = await put(`translated_multi_${Date.now()}.xlsx`, buffer as any, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      allowOverwrite: true,
+    });
+
+    return res.json({ url: blob.url, totalTranslated: keys.length, languages: targetLangs });
+  } catch (err) {
+    console.error("Translate Error:", err);
+    return res.status(500).json({ message: "An error occurred during translation." });
+  }
+});
+
+// ================= AUTO TRANSLATE (JS) - MULTI LANGUAGES (ARCHIVER ZIP) =================
+app.post("/translate-js", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const { fileUrl, targetLangs } = req.body;
+
+    if (!fileUrl || !targetLangs || !Array.isArray(targetLangs) || targetLangs.length === 0) {
+      return res.status(400).json({ message: "Please provide a file URL and at least one target language." });
+    }
+
+    const fileRes = await fetch(fileUrl);
+    if (!fileRes.ok) return res.status(400).json({ message: "Cannot fetch the file from storage." });
+
+    const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
+    const fileContent = fileBuffer.toString("utf-8");
+
+    let data: Record<string, string> = {};
+    try {
+      data = eval(wrapJsFileContent(fileContent));
+    } catch (e) {
+      return res.status(400).json({ message: "Invalid JS file format." });
+    }
+
+    const keys = Object.keys(data);
+    const originalValues = Object.values(data);
+
+    const archive = archiver("zip", { zlib: { level: 9 } });
+    const chunks: Buffer[] = [];
+    const writable = new Writable({
+      write(chunk, _, cb) {
+        chunks.push(chunk);
+        cb();
+      },
+    });
+    archive.pipe(writable);
+
+    for (const lang of targetLangs) {
+      console.log(`\n🌍 STARTING JS TRANSLATION FOR LANGUAGE: ${lang.toUpperCase()}`);
+      let currentLangTranslations: string[] = new Array(originalValues.length).fill("");
+      const plainTextBatch: { index: number; text: string }[] = [];
+
+      for (let i = 0; i < originalValues.length; i++) {
+        const str = (originalValues[i] === null || originalValues[i] === undefined) ? "" : String(originalValues[i]);
+
+        if (isHtml(str)) {
+          const htmlRes = await translateComplexHtml(str, lang);
+          currentLangTranslations[i] = htmlRes;
+        } else {
+          currentLangTranslations[i] = str;
+          if (str.trim()) plainTextBatch.push({ index: i, text: str });
+        }
+      }
+
+      console.log(`🚀 Translating ${plainTextBatch.length} plain text items to ${lang}...`);
+      for (let i = 0; i < plainTextBatch.length; i += 30) {
+        const batch = plainTextBatch.slice(i, i + 30);
+        const textsToTranslate = batch.map(b => b.text);
+
+        try {
+          const res = await translate(textsToTranslate, { to: lang });
+          batch.forEach((b, idx) => { currentLangTranslations[b.index] = res[idx]; });
+          await delay(2000);
+        } catch (err) {
+          console.warn(`⚠️ Chunk failed. Falling back to 1-by-1 for lang ${lang}...`);
+          for (const b of batch) {
+            try {
+              const singleRes = await translate(b.text, { to: lang });
+              currentLangTranslations[b.index] = singleRes;
+              await delay(1000);
+            } catch (e) { }
+          }
+        }
+      }
+
+      const resultObj: Record<string, string> = {};
+      keys.forEach((key, index) => {
+        resultObj[key] = currentLangTranslations[index];
+      });
+
+      const jsString = generateJsFile(resultObj);
+
+      archive.append(jsString, { name: `${lang}.js` });
+    }
+
+    await archive.finalize();
+    const zipBuffer = Buffer.concat(chunks);
+
+    const blob = await put(`translated_js_locales_${Date.now()}.zip`, zipBuffer, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      allowOverwrite: true,
+    });
+
+    return res.json({ url: blob.url, totalTranslated: keys.length, languages: targetLangs });
+  } catch (err) {
+    console.error("Translate JS Error:", err);
+    return res.status(500).json({ message: "An error occurred during JS translation." });
+  }
+});
+
+// ================= LANGUAGE MANAGEMENT =================
+app.get("/languages", verifyToken, async (req, res) => {
+  try {
+    const langs = await Language.find().sort({ name: 1 });
+    res.json(langs);
+  } catch (err) {
+    res.status(500).json({ message: "Cannot get languages" });
+  }
+});
+
+app.post("/admin/languages", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { code, name } = req.body;
+    if (!code || !name) return res.status(400).json({ message: "Code and Name cannot be empty" });
+
+    const normalizedCode = code.trim().toLowerCase();
+    const exists = await Language.exists({ code: normalizedCode });
+    if (exists) return res.status(400).json({ message: "This language code already exists" });
+
+    await Language.create({ code: normalizedCode, name: name.trim() });
+    res.json({ message: "Language added successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to add language" });
+  }
+});
+
+app.delete("/admin/languages/:code", verifyToken, verifyAdmin, async (req, res) => {
+  try {
+    const { code } = req.params;
+    await Language.deleteOne({ code });
+    res.json({ message: "Language deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete language" });
   }
 });
 

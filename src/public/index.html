@@ -104,7 +104,7 @@
         <div class="marquee">
           <span>
             🚀 If the Key Generator Tool has been valuable to your workflow and
-            saved you time, please consider supporting the developer. ☕
+            saved you time, please consider supporting the developer.
             <a
               href="javascript:void(0)"
               onclick="openDonationPopup()"
@@ -190,6 +190,12 @@
               <button id="btn-diff-js" onclick="switchDevMode('diff-js')">
                 🔍 Compare JS
               </button>
+              <button
+                id="btn-translate-js"
+                onclick="switchDevMode('translate-js')"
+              >
+                🌍 Auto Translate JS
+              </button>
             </div>
 
             <!-- JS → Excel -->
@@ -249,6 +255,26 @@
               </button>
             </form>
 
+            <form id="form-dev-translate-js" style="display: none">
+              <div class="form-group">
+                <label>Original JS File</label>
+                <input type="file" name="fileOriginal" accept=".js" required />
+              </div>
+              <div class="form-group">
+                <label>Target Languages (Select one or more)</label>
+                <div class="multi-select-box lang-checkbox-container">
+                  Loading languages...
+                </div>
+              </div>
+              <button
+                id="button-dev-translate-js"
+                type="submit"
+                style="background: #8b5cf6"
+              >
+                Translate JS File
+              </button>
+            </form>
+
             <div id="loading-dev" style="margin-top: 15px; display: none">
               <div class="spinner"></div>
               <div>Processing...</div>
@@ -272,6 +298,9 @@
               </div>
               <div class="cs-tab" onclick="switchCsTab(2)">
                 Diff Checker (Excel)
+              </div>
+              <div class="cs-tab" onclick="switchCsTab(3)">
+                Auto Translate 🌍
               </div>
             </div>
 
@@ -489,15 +518,193 @@
                 ></a>
               </div>
             </div>
+
+            <div class="cs-tab-content">
+              <h4>Auto Translate Excel File</h4>
+              <p
+                style="
+                  font-size: 13px;
+                  color: gray;
+                  margin-top: -10px;
+                  margin-bottom: 15px;
+                "
+              >
+                Powered by Google Translate. Automatically translates your
+                language values into a target language.
+              </p>
+              <form id="form-cs-translate">
+                <div class="form-group">
+                  <label>Original Excel File</label>
+                  <input
+                    type="file"
+                    name="fileOriginal"
+                    accept=".xlsx, .xls, .csv, .ods"
+                    required
+                  />
+                </div>
+
+                <div
+                  style="
+                    display: flex;
+                    gap: 10px;
+                    margin-top: 8px;
+                    margin-bottom: 14px;
+                  "
+                >
+                  <div class="form-group" style="flex: 1; margin-bottom: 0">
+                    <input
+                      type="text"
+                      name="keyColumn"
+                      placeholder="Key Col (default 1)"
+                    />
+                  </div>
+                  <div class="form-group" style="flex: 1; margin-bottom: 0">
+                    <input
+                      type="text"
+                      name="valueColumn"
+                      placeholder="Value Col (default 2)"
+                    />
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label>Target Languages (Select one or more)</label>
+                  <div class="multi-select-box lang-checkbox-container">
+                    Loading languages...
+                  </div>
+                </div>
+
+                <button
+                  id="button-cs-translate"
+                  type="submit"
+                  style="background: #8b5cf6"
+                >
+                  Translate Now
+                </button>
+              </form>
+
+              <div
+                id="loading-cs-translate"
+                style="margin-top: 15px; display: none"
+              >
+                <div class="spinner" style="border-top-color: #8b5cf6"></div>
+                <div>
+                  Translating... This may take a while depending on file size.
+                </div>
+              </div>
+              <div
+                id="result-cs-translate"
+                style="margin-top: 20px; display: none"
+              >
+                <p><strong>Success! Download Link:</strong></p>
+                <a
+                  id="download-link-cs-translate"
+                  href="#"
+                  target="_blank"
+                  style="color: #8b5cf6"
+                ></a>
+              </div>
+            </div>
           </div>
 
           <div class="tab-content" id="content-admin">
             <h3>⚙️ User management</h3>
+
+            <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee" />
+
+            <h3>🌐 Language Management</h3>
             <p
               style="
                 font-size: 14px;
                 color: gray;
                 margin-top: -10px;
+                margin-bottom: 20px;
+              "
+            >
+              Setup supported languages for the Auto Translate tool
+            </p>
+
+            <form
+              id="form-add-lang"
+              style="display: flex; gap: 10px; margin-bottom: 20px"
+            >
+              <input
+                type="text"
+                name="code"
+                placeholder="Code (e.g. vi)"
+                required
+                style="
+                  width: 120px;
+                  padding: 10px;
+                  border: 1px solid #ccc;
+                  border-radius: 6px;
+                "
+              />
+              <input
+                type="text"
+                name="name"
+                placeholder="Language Name (e.g. Vietnamese)"
+                required
+                style="
+                  flex: 1;
+                  padding: 10px;
+                  border: 1px solid #ccc;
+                  border-radius: 6px;
+                "
+              />
+              <button
+                type="submit"
+                id="btn-add-lang"
+                style="background: #1976d2"
+              >
+                Add Language
+              </button>
+            </form>
+
+            <div
+              style="
+                border: 1px solid #eee;
+                border-radius: 8px;
+                overflow: hidden;
+              "
+            >
+              <table
+                style="width: 100%; border-collapse: collapse; text-align: left"
+              >
+                <thead style="background: #f9fafb">
+                  <tr>
+                    <th
+                      style="
+                        padding: 12px;
+                        border-bottom: 1px solid #eee;
+                        width: 150px;
+                      "
+                    >
+                      Code
+                    </th>
+                    <th style="padding: 12px; border-bottom: 1px solid #eee">
+                      Language Name
+                    </th>
+                    <th
+                      style="
+                        padding: 12px;
+                        border-bottom: 1px solid #eee;
+                        width: 100px;
+                      "
+                    >
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody id="lang-list-tbody"></tbody>
+              </table>
+            </div>
+
+            <p
+              style="
+                font-size: 14px;
+                color: gray;
+                margin-top: 20px;
                 margin-bottom: 20px;
               "
             >
@@ -609,12 +816,21 @@
             <div>📊 Diff Excel</div>
             <div id="diff-excel-count" class="stat-number">0</div>
           </div>
+          <div class="stat-card">
+            <div>🌍 Auto Translate</div>
+            <div id="translate-excel-count" class="stat-number">0</div>
+          </div>
+          <div class="stat-card">
+            <div>🌍 Translate JS</div>
+            <div id="translate-js-count" class="stat-number">0</div>
+          </div>
         </div>
       </div>
     </div>
 
     <script type="module">
       import { initAuth } from "/js/main.js";
+      import { loadLanguages, initLanguageEvents } from "/js/languages.js";
 
       window.closePopup = function () {
         document.getElementById("donation-popup").style.display = "none";
@@ -668,6 +884,16 @@
       window.onload = function () {
         initAuth();
         showDonationPopup();
+
+        // Khởi tạo các sự kiện Submit Form & Delete Language
+        initLanguageEvents();
+
+        // Kiểm tra nếu người dùng đã đăng nhập (có token) thì tải danh sách ngôn ngữ ngay
+        setTimeout(() => {
+          if (localStorage.getItem("app_token")) {
+            loadLanguages();
+          }
+        }, 500); // Delay nhẹ 0.5s để đợi DOM render ổn định
       };
     </script>
   </body>
