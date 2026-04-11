@@ -161,29 +161,34 @@ function switchTab(index) {
 function switchDevMode(mode) {
   const resultDiv = document.getElementById("result-dev");
   const link = document.getElementById("download-link-dev");
-
   link.href = "";
   link.textContent = "";
   resultDiv.style.display = "none";
 
   const formJs = document.getElementById("form-dev-js");
   const formExcel = document.getElementById("form-dev-excel");
+  const formDiffJs = document.getElementById("form-dev-diff-js");
 
   const btnJs = document.getElementById("btn-js");
   const btnExcel = document.getElementById("btn-excel");
+  const btnDiffJs = document.getElementById("btn-diff-js");
+
+  formJs.style.display = "none";
+  formExcel.style.display = "none";
+  formDiffJs.style.display = "none";
+  btnJs.classList.remove("active");
+  btnExcel.classList.remove("active");
+  btnDiffJs.classList.remove("active");
 
   if (mode === "js-to-excel") {
     formJs.style.display = "block";
-    formExcel.style.display = "none";
-
     btnJs.classList.add("active");
-    btnExcel.classList.remove("active");
-  } else {
-    formJs.style.display = "none";
+  } else if (mode === "excel-to-js") {
     formExcel.style.display = "block";
-
-    btnJs.classList.remove("active");
     btnExcel.classList.add("active");
+  } else if (mode === "diff-js") {
+    formDiffJs.style.display = "block";
+    btnDiffJs.classList.add("active");
   }
 }
 
@@ -254,24 +259,21 @@ export async function uploadFile(file, token) {
 
 function tabDev() {
   document
-    .getElementById("form-dev-js")
+    .getElementById("form-dev-diff-js")
     ?.addEventListener("submit", async (e) => {
       e.preventDefault();
-
       const form = e.target;
-      const file = form.querySelector('input[name="file"]').files?.[0];
-
-      if (!file) return;
+      const fileOld = form.querySelector('input[name="fileOld"]').files[0];
+      const fileNew = form.querySelector('input[name="fileNew"]').files[0];
 
       const resultDiv = document.getElementById("result-dev");
       const link = document.getElementById("download-link-dev");
       const loading = document.getElementById("loading-dev");
-      const button = document.getElementById("button-dev-js");
+      const button = document.getElementById("button-dev-diff-js");
 
       link.href = "";
       link.textContent = "";
       resultDiv.style.display = "none";
-
       loading.style.display = "block";
       button.disabled = true;
       button.textContent = "Uploading...";
@@ -280,38 +282,35 @@ function tabDev() {
         const resToken = await fetchWithAuth("/blob-token");
         const dataToken = await resToken.json();
 
-        const url = await uploadFile(file, dataToken.token);
+        const [oldUrl, newUrl] = await Promise.all([
+          uploadFile(fileOld, dataToken.token),
+          uploadFile(fileNew, dataToken.token),
+        ]);
 
-        button.textContent = "Processing...";
+        button.textContent = "Comparing...";
 
-        const res = await fetchWithAuth("/upload", {
+        const res = await fetchWithAuth("/diff-js", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ fileUrl: url }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ oldFileUrl: oldUrl, newFileUrl: newUrl }),
         });
 
         const data = await res.json();
-
-        if (!res.ok) {
-          throw new Error(data.message || "Please try again later");
-        }
+        if (!res.ok)
+          throw new Error(data.message || "Failed to compare JS files");
 
         requestAnimationFrame(() => {
           link.href = data.url;
-          link.textContent = data.url;
-
+          link.textContent = "Download Diff Report";
           resultDiv.style.display = "block";
         });
         loadStats();
       } catch (err) {
         alert(`❌ Error: ${err.message}`);
-        console.error(err);
       } finally {
         loading.style.display = "none";
         button.disabled = false;
-        button.textContent = "Convert";
+        button.textContent = "Compare JS Files";
       }
     });
 
@@ -574,6 +573,74 @@ function tabCS() {
         button.textContent = "Generate ZIP";
       }
     });
+
+  document
+    .getElementById("form-cs-diff-excel")
+    ?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const fileOld = form.querySelector('input[name="fileOld"]').files[0];
+      const fileNew = form.querySelector('input[name="fileNew"]').files[0];
+
+      const keyColumnOld = form.keyColumnOld.value || 1;
+      const valueColumnOld = form.valueColumnOld.value || 2;
+      const keyColumnNew = form.keyColumnNew.value || 1;
+      const valueColumnNew = form.valueColumnNew.value || 2;
+
+      const resultDiv = document.getElementById("result-cs-diff-excel");
+      const link = document.getElementById("download-link-cs-diff-excel");
+      const loading = document.getElementById("loading-cs-diff-excel");
+      const button = document.getElementById("button-cs-diff-excel");
+
+      link.href = "";
+      link.textContent = "";
+      resultDiv.style.display = "none";
+      loading.style.display = "block";
+      button.disabled = true;
+      button.textContent = "Uploading...";
+
+      try {
+        const resToken = await fetchWithAuth("/blob-token");
+        const dataToken = await resToken.json();
+
+        const [oldUrl, newUrl] = await Promise.all([
+          uploadFile(fileOld, dataToken.token),
+          uploadFile(fileNew, dataToken.token),
+        ]);
+
+        button.textContent = "Comparing...";
+
+        const res = await fetchWithAuth("/diff-excel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            oldFileUrl: oldUrl,
+            newFileUrl: newUrl,
+            keyColumnOld,
+            valueColumnOld,
+            keyColumnNew,
+            valueColumnNew,
+          }),
+        });
+
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.message || "Failed to compare Excel files");
+
+        requestAnimationFrame(() => {
+          link.href = data.url;
+          link.textContent = "Download Diff Report";
+          resultDiv.style.display = "block";
+        });
+        loadStats();
+      } catch (err) {
+        alert(`❌ Error: ${err.message}`);
+      } finally {
+        loading.style.display = "none";
+        button.disabled = false;
+        button.textContent = "Check Differences";
+      }
+    });
 }
 
 export async function loadStats() {
@@ -587,6 +654,8 @@ export async function loadStats() {
         key: "generate-locales",
         endpoint: "/v2/generate-excels-for-each-locales",
       },
+      { key: "diff-js-count", endpoint: "/diff-js" },
+      { key: "diff-excel-count", endpoint: "/diff-excel" },
     ];
 
     for (const item of endpoints) {

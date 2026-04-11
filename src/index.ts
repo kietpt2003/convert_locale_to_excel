@@ -785,6 +785,173 @@ app.delete("/admin/users/:email", verifyToken, verifyAdmin, async (req, res) => 
   }
 });
 
+// ================= DIFF CHECKER (COMPARE 2 JS FILES) =================
+app.post("/diff-js", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const { oldFileUrl, newFileUrl } = req.body;
+
+    if (!oldFileUrl || !newFileUrl) {
+      return res.status(400).json({ message: "Please provide both files to compare." });
+    }
+
+    const [oldRes, newRes] = await Promise.all([fetch(oldFileUrl), fetch(newFileUrl)]);
+    if (!oldRes.ok || !newRes.ok) {
+      return res.status(400).json({ message: "Cannot fetch files from storage." });
+    }
+
+    const oldBuffer = Buffer.from(await oldRes.arrayBuffer());
+    const newBuffer = Buffer.from(await newRes.arrayBuffer());
+
+    // Đọc nội dung 2 file JS
+    const oldData: Record<string, string> = eval(wrapJsFileContent(oldBuffer.toString("utf-8")));
+    const newData: Record<string, string> = eval(wrapJsFileContent(newBuffer.toString("utf-8")));
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Diff Report");
+
+    // Khởi tạo Header bằng Tiếng Anh
+    sheet.columns = [
+      { header: "Key", key: "key", width: 40 },
+      { header: "Old Value", key: "oldValue", width: 50 },
+      { header: "New Value", key: "newValue", width: 50 },
+      { header: "Status", key: "status", width: 20 },
+    ];
+
+    const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)]));
+
+    allKeys.forEach((key) => {
+      const oldVal = oldData[key];
+      const newVal = newData[key];
+      let status = "";
+      let color = ""; // Mã màu ARGB cho background cell
+
+      if (oldVal === undefined && newVal !== undefined) {
+        status = "Added";
+        color = "FFC6EFCE"; // Light Green
+      } else if (oldVal !== undefined && newVal === undefined) {
+        status = "Removed";
+        color = "FFFFC7CE"; // Light Red
+      } else if (oldVal !== newVal) {
+        status = "Modified";
+        color = "FFFFEB9C"; // Light Yellow
+      } else {
+        status = "Unchanged";
+        color = "FFFFFFFF"; // White
+      }
+
+      const row = sheet.addRow({
+        key: key,
+        oldValue: oldVal || "",
+        newValue: newVal || "",
+        status: status,
+      });
+
+      // Tô màu dòng
+      if (color !== "FFFFFFFF") {
+        row.eachCell((cell) => {
+          cell.fill = {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: color },
+          };
+        });
+      }
+    });
+
+    sheet.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = await put(`diff_report_${Date.now()}.xlsx`, buffer as any, {
+      access: "public",
+      token: process.env.BLOB_READ_WRITE_TOKEN,
+      allowOverwrite: true,
+    });
+
+    return res.json({ url: blob.url });
+  } catch (err) {
+    console.error("Diff Error:", err);
+    return res.status(500).json({ message: "An error occurred while generating the diff report." });
+  }
+});
+
+// ================= DIFF CHECKER (COMPARE 2 EXCEL FILES) =================
+app.post("/diff-excel", verifyToken, async (req: Request, res: Response) => {
+  try {
+    const {
+      oldFileUrl, newFileUrl,
+      keyColumnOld = 1, valueColumnOld = 2,
+      keyColumnNew = 1, valueColumnNew = 2
+    } = req.body;
+
+    if (!oldFileUrl || !newFileUrl) {
+      return res.status(400).json({ message: "Please provide both Excel files to compare." });
+    }
+
+    const [oldRes, newRes] = await Promise.all([fetch(oldFileUrl), fetch(newFileUrl)]);
+    if (!oldRes.ok || !newRes.ok) {
+      return res.status(400).json({ message: "Cannot fetch files from storage." });
+    }
+
+    const oldBuffer = Buffer.from(await oldRes.arrayBuffer());
+    const newBuffer = Buffer.from(await newRes.arrayBuffer());
+
+    // Đọc nội dung 2 file Excel
+    const oldData = await parseExcelToObject(oldBuffer, Number(keyColumnOld), Number(valueColumnOld));
+    const newData = await parseExcelToObject(newBuffer, Number(keyColumnNew), Number(valueColumnNew));
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Diff Report");
+
+    sheet.columns = [
+      { header: "Key", key: "key", width: 40 },
+      { header: "Old Value", key: "oldValue", width: 50 },
+      { header: "New Value", key: "newValue", width: 50 },
+      { header: "Status", key: "status", width: 20 },
+    ];
+
+    const allKeys = Array.from(new Set([...Object.keys(oldData), ...Object.keys(newData)]));
+
+    allKeys.forEach((key) => {
+      const oldVal = oldData[key];
+      const newVal = newData[key];
+      let status = "";
+      let color = "";
+
+      if (oldVal === undefined && newVal !== undefined) {
+        status = "Added"; color = "FFC6EFCE"; // Green
+      } else if (oldVal !== undefined && newVal === undefined) {
+        status = "Removed"; color = "FFFFC7CE"; // Red
+      } else if (oldVal !== newVal) {
+        status = "Modified"; color = "FFFFEB9C"; // Yellow
+      } else {
+        status = "Unchanged"; color = "FFFFFFFF"; // White
+      }
+
+      const row = sheet.addRow({
+        key: key, oldValue: oldVal || "", newValue: newVal || "", status: status,
+      });
+
+      if (color !== "FFFFFFFF") {
+        row.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: color } };
+        });
+      }
+    });
+
+    sheet.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = await put(`diff_excel_report_${Date.now()}.xlsx`, buffer as any, {
+      access: "public", token: process.env.BLOB_READ_WRITE_TOKEN, allowOverwrite: true,
+    });
+
+    return res.json({ url: blob.url });
+  } catch (err) {
+    console.error("Diff Excel Error:", err);
+    return res.status(500).json({ message: "An error occurred while generating the Excel diff report." });
+  }
+});
+
 app.use(express.static(path.resolve('src/public')));
 
 app.listen(PORT, () => {
