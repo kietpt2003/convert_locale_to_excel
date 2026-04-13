@@ -541,3 +541,28 @@ button:disabled {
   margin-right: 10px;
   cursor: pointer;
 }
+
+/* ================= TEMPLATE LINK ================= */
+.template-link {
+  font-size: 13px;
+  color: #1976d2;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.template-link:hover {
+  text-decoration: underline;
+  color: #1565c0;
+}
+
+.form-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+.form-header label {
+  margin-bottom: 0 !important;
+}
