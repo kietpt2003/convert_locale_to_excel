@@ -1223,7 +1223,6 @@ app.get("/get-agent-url", verifyToken, async (req: Request, res: Response) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${clientToken}`,
         },
-        signal: AbortSignal.timeout(5000)
       });
 
       if (pingRes.ok) {
