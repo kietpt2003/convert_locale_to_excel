@@ -28,6 +28,7 @@ import { shouldTrackEndpoint } from "./utils/shouldTrackEndpoint.js";
 import { verifyToken, verifyAdmin } from "./middleware/validation.js";
 import translateComplexHtml from "./utils/translateComplexHtml.js";
 import delay from "./utils/delay.js";
+import parseExcelToObjectV2 from "./utils/parseExcelToObject.v2.js";
 
 const app = express();
 const PORT = 3000;
@@ -409,13 +410,13 @@ app.post("/upload-excel-merge-zip", verifyToken, async (req: Request, res: Respo
     const file1Buffer = Buffer.from(await file1Res.arrayBuffer());
     const file2Buffer = Buffer.from(await file2Res.arrayBuffer());
 
-    const data1 = await parseExcelToObject(
+    const data1 = await parseExcelToObjectV2(
       file1Buffer,
       Number(keyColumnFile1),
       Number(valueColumnFile1)
     );
 
-    const data2 = await parseExcelToObject(
+    const data2 = await parseExcelToObjectV2(
       file2Buffer,
       Number(keyColumnFile2),
       Number(valueColumnFile2)
