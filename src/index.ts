@@ -1223,7 +1223,7 @@ app.get("/get-agent-url", verifyToken, async (req: Request, res: Response) => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${clientToken}`,
         },
-        // signal: AbortSignal.timeout(5000)
+        signal: AbortSignal.timeout(5000)
       });
 
       if (pingRes.ok) {
@@ -1232,13 +1232,10 @@ app.get("/get-agent-url", verifyToken, async (req: Request, res: Response) => {
         throw new Error("Server Chat Configure Error.");
       }
     } catch (pingErr) {
-      console.log('check error', pingErr);
-
       return res.status(404).json({ message: "Server Chat is currently under maintenance or has lost connection." });
     }
 
   } catch (err) {
-    console.log('check error2', err);
     return res.status(404).json({ message: "Server Chat is currently under maintenance or has lost connection." });
   }
 });
