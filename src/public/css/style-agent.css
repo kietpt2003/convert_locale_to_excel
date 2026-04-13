@@ -1,0 +1,316 @@
+/* =========================================
+   MESSENGER-STYLE CHAT AGENT WIDGET (TEAL EDITION)
+   ========================================= */
+
+/* Biến màu chủ đạo (Xanh ngọc bích / Teal) */
+:root {
+  --agent-primary: #0d9488; /* Teal 600 */
+  --agent-primary-hover: #0f766e; /* Teal 700 */
+  --agent-gradient-start: #0ea5e9; /* Sky 500 */
+  --agent-gradient-end: #0d9488; /* Teal 600 */
+  --agent-shadow: rgba(13, 148, 136, 0.3);
+  --agent-online: #22c55e; /* Green 500 */
+}
+
+#agent-widget {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 99999;
+  user-select: none;
+  touch-action: none;
+}
+
+/* --- BUBBLE (Bong bóng) --- */
+#agent-bubble {
+  width: 64px;
+  height: 64px;
+  background: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px var(--agent-shadow);
+  cursor: grab;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 3px solid var(--agent-primary);
+  overflow: hidden;
+}
+
+#agent-bubble img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+#agent-bubble:hover {
+  transform: scale(1.08);
+}
+
+#agent-bubble:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+/* --- WINDOW (Cửa sổ) --- */
+#agent-window {
+  display: none;
+  width: 360px;
+  height: 540px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  flex-direction: column;
+  overflow: hidden;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  border: 1px solid #e2e8f0;
+}
+
+/* --- HEADER --- */
+.agent-header {
+  background: linear-gradient(
+    135deg,
+    var(--agent-gradient-start),
+    var(--agent-gradient-end)
+  );
+  color: white;
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: grab;
+}
+
+.agent-header:active {
+  cursor: grabbing;
+}
+
+.agent-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-header-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  object-fit: cover;
+  background: #fff;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.agent-header h3 {
+  margin: 0 0 2px 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+/* KHU VỰC TRẠNG THÁI ONLINE */
+.status-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-text {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.online-dot {
+  width: 8px;
+  height: 8px;
+  background-color: #4ade80; /* Màu xanh lá nổi bật trên nền gradient */
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+    box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.3);
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.agent-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.agent-close-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* --- MESSAGES AREA --- */
+#agent-messages {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Custom thanh cuộn */
+#agent-messages::-webkit-scrollbar {
+  width: 6px;
+}
+#agent-messages::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.msg {
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 18px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  position: relative;
+  word-wrap: break-word;
+  animation: fadeInMsg 0.3s ease;
+}
+
+@keyframes fadeInMsg {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tin nhắn của BOT */
+.msg.bot {
+  background: #ffffff;
+  color: #334155;
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  margin-left: 42px;
+}
+
+/* TỰ ĐỘNG CHÈN AVATAR VÀO BÊN TRÁI TIN NHẮN CỦA BOT */
+.msg.bot::before {
+  content: "";
+  position: absolute;
+  left: -42px;
+  bottom: 0;
+  width: 32px;
+  height: 32px;
+  background-image: url("../assets/kietJuniorAvatar.png");
+  background-size: cover;
+  background-position: center;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+}
+
+/* Tin nhắn của USER */
+.msg.user {
+  background: var(--agent-primary);
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 2px 5px var(--agent-shadow);
+}
+
+/* --- INPUT AREA --- */
+.agent-input-area {
+  padding: 14px 16px;
+  background: white;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.agent-input-area input {
+  flex: 1;
+  padding: 12px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  outline: none;
+  font-size: 14px;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+  background: #f8fafc;
+}
+
+.agent-input-area input:focus {
+  border-color: var(--agent-primary);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.agent-input-area input:disabled {
+  background: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.agent-input-area button {
+  background: var(--agent-primary);
+  color: white;
+  border: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.2s,
+    transform 0.2s;
+}
+
+.agent-input-area button:hover:not(:disabled) {
+  background: var(--agent-primary-hover);
+  transform: scale(1.05);
+}
+
+.agent-input-area button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-input-area button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: translateX(-1px);
+}

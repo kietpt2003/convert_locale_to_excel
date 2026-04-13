@@ -1,3 +1,5 @@
+import { initChatAgent } from "./chat-agent.js";
+
 let authToken = localStorage.getItem("app_token");
 
 async function fetchWithAuth(url, options = {}) {
@@ -921,6 +923,12 @@ export function init() {
   tabDev();
 
   tabCS();
+
+  const agentWidget = document.getElementById("agent-widget");
+  if (agentWidget) {
+    agentWidget.style.display = "block"; // Hiện Widget lên
+    initChatAgent(); // Kích hoạt kéo thả và tính năng gửi Chat
+  }
 }
 
 async function loadAdminUsers() {

@@ -29,6 +29,7 @@ import { verifyToken, verifyAdmin } from "./middleware/validation.js";
 import translateComplexHtml from "./utils/translateComplexHtml.js";
 import delay from "./utils/delay.js";
 import parseExcelToObjectV2 from "./utils/parseExcelToObject.v2.js";
+import Tunnel from "./models/Tunnel.js";
 
 const app = express();
 const PORT = 3000;
@@ -983,7 +984,6 @@ app.post("/translate-excel", verifyToken, async (req: Request, res: Response) =>
     // =========================================================================
     const translationsByLang: Record<string, string[]> = {};
     for (const lang of targetLangs) {
-      console.log(`\n🌍 STARTING TRANSLATION FOR LANGUAGE: ${lang.toUpperCase()}`);
       let currentLangTranslations: string[] = new Array(originalValues.length).fill("");
       const plainTextBatch: { index: number; text: string }[] = [];
 
@@ -1001,7 +1001,6 @@ app.post("/translate-excel", verifyToken, async (req: Request, res: Response) =>
         }
       }
 
-      console.log(`🚀 Translating ${plainTextBatch.length} plain text items to ${lang}...`);
       for (let i = 0; i < plainTextBatch.length; i += 30) {
         const batch = plainTextBatch.slice(i, i + 30);
         const textsToTranslate = batch.map(b => b.text);
@@ -1106,7 +1105,6 @@ app.post("/translate-js", verifyToken, async (req: Request, res: Response) => {
     archive.pipe(writable);
 
     for (const lang of targetLangs) {
-      console.log(`\n🌍 STARTING JS TRANSLATION FOR LANGUAGE: ${lang.toUpperCase()}`);
       let currentLangTranslations: string[] = new Array(originalValues.length).fill("");
       const plainTextBatch: { index: number; text: string }[] = [];
 
@@ -1122,7 +1120,6 @@ app.post("/translate-js", verifyToken, async (req: Request, res: Response) => {
         }
       }
 
-      console.log(`🚀 Translating ${plainTextBatch.length} plain text items to ${lang}...`);
       for (let i = 0; i < plainTextBatch.length; i += 30) {
         const batch = plainTextBatch.slice(i, i + 30);
         const textsToTranslate = batch.map(b => b.text);
@@ -1202,6 +1199,44 @@ app.delete("/admin/languages/:code", verifyToken, verifyAdmin, async (req, res) 
     res.json({ message: "Language deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete language" });
+  }
+});
+
+app.get("/get-agent-url", verifyToken, async (req: Request, res: Response) => {
+  try {
+    // Find tunnel with service: 'ai-agent'
+    const tunnel = await Tunnel.findOne({ service: "ai-agent" });
+
+    if (!tunnel) {
+      return res.status(404).json({ message: "Server Chat Agent not found. Please contact Super Admin." });
+    }
+
+    const agentUrl = tunnel.url;
+
+    // Ping server Chat
+    try {
+      const clientToken = req.headers.authorization?.split(" ")[1] || "";
+
+      const pingRes = await fetch(`${agentUrl}/api/ping`, {
+        method: 'GET',
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${clientToken}`,
+        },
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (pingRes.ok) {
+        return res.json({ url: agentUrl + '/api/chat' });
+      } else {
+        throw new Error("Server Chat Configure Error.");
+      }
+    } catch (pingErr) {
+      return res.status(404).json({ message: "Server Chat is currently under maintenance or has lost connection." });
+    }
+
+  } catch (err) {
+    return res.status(404).json({ message: "Server Chat is currently under maintenance or has lost connection." });
   }
 });
 

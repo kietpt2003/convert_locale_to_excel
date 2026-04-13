@@ -7,6 +7,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <link rel="stylesheet" href="/css/style.css" />
+    <link rel="stylesheet" href="/css/style-agent.css" />
   </head>
 
   <body>
@@ -945,6 +946,57 @@
             <div>🌍 Translate JS</div>
             <div id="translate-js-count" class="stat-number">0</div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="agent-widget" style="display: none">
+      <div id="agent-bubble">
+        <img
+          src="assets/kietJuniorAvatar.png"
+          alt="Kiet Junior"
+          draggable="false"
+        />
+      </div>
+
+      <div id="agent-window">
+        <div class="agent-header" id="agent-header">
+          <div class="agent-header-info">
+            <img
+              src="assets/kietJuniorAvatar.png"
+              class="agent-header-avatar"
+              alt="Avatar"
+              draggable="false"
+            />
+            <div>
+              <h3>Kiet Junior</h3>
+              <div class="status-container">
+                <span class="online-dot"></span>
+                <span class="status-text">Virtual Assistant</span>
+              </div>
+            </div>
+          </div>
+          <button class="agent-close-btn" id="agent-close-btn">&times;</button>
+        </div>
+
+        <div id="agent-messages">
+          <div class="msg bot">
+            Hello! I'm Kiet Junior, Tuan Kiet's virtual assistant. How can I
+            help with your project? 👋
+          </div>
+        </div>
+
+        <div class="agent-input-area">
+          <input
+            type="text"
+            id="agent-input"
+            placeholder="Ask me something..."
+          />
+          <button id="agent-send-btn">
+            <svg viewBox="0 0 24 24">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
