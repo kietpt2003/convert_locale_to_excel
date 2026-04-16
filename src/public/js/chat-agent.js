@@ -222,11 +222,32 @@ export async function streamAgentReply(
 
       for (const part of parts) {
         if (part.trim()) {
-          try {
-            // Lọc bỏ tiền tố "data: " nếu server dùng chuẩn SSE
-            const jsonStr = part.replace(/^data:\s*/, "");
-            const parsed = JSON.parse(jsonStr.trim());
+          // Lọc bỏ tiền tố "data: " nếu server dùng chuẩn SSE
+          const jsonStr = part.replace(/^data:\s*/, "").trim();
 
+          // --- MỚI THÊM: Xử lý tín hiệu kết thúc từ Server ---
+          if (jsonStr === "[DONE]") {
+            break; // Thoát khỏi vòng lặp xử lý part
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+
+            // --- MỚI THÊM: BẮT LỖI TỪ SERVER (TIMEOUT, LỖI LLM...) ---
+            if (parsed.error) {
+              if (isFirstChunk) {
+                botMsgEl.innerHTML = "";
+                isFirstChunk = false;
+              }
+              // Hiển thị chữ màu đỏ hoặc nổi bật để user biết là lỗi
+              botMsgEl.innerHTML += `<br><span style="color: #dc2626; font-weight: 500;">⚠️ ${parsed.error}</span>`;
+              messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+              // Chủ động ngắt stream luôn vì đã có lỗi
+              return;
+            }
+
+            // --- XỬ LÝ TEXT BÌNH THƯỜNG ---
             if (parsed.answer) {
               if (isFirstChunk) {
                 botMsgEl.innerHTML = ""; // Remove "Thinking..."
