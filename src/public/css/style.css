@@ -153,6 +153,9 @@ button:disabled {
 
 .dev-mode-buttons {
   margin-bottom: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .dev-mode-buttons button {
@@ -516,7 +519,6 @@ button:disabled {
   }
 }
 
-/* ================= MULTI-SELECT BOX ================= */
 .multi-select-box {
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -542,7 +544,6 @@ button:disabled {
   cursor: pointer;
 }
 
-/* ================= TEMPLATE LINK ================= */
 .template-link {
   font-size: 13px;
   color: #1976d2;
@@ -565,4 +566,83 @@ button:disabled {
 }
 .form-header label {
   margin-bottom: 0 !important;
+}
+
+.btn-redmine-shining {
+  text-decoration: none;
+  background: #ffffff;
+  color: #ed2c24;
+  border: 2px solid #ed2c24;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 800;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(237, 44, 36, 0.2);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.redmine_logo_original {
+  width: 22px;
+  height: auto;
+}
+
+.btn-redmine-shining::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 50px;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(237, 44, 36, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(30deg);
+  animation: shine-red 2.5s infinite linear;
+}
+
+@keyframes shine-red {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+
+.btn-redmine-shining {
+  animation: border-pulse 2s infinite;
+}
+
+@keyframes border-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(237, 44, 36, 0.4);
+    border-color: #ed2c24;
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(237, 44, 36, 0.2);
+    border-color: #ff6b66;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(237, 44, 36, 0.4);
+    border-color: #ed2c24;
+  }
+}
+
+.btn-redmine-shining:hover {
+  background-color: #ed2c24;
+  color: #fff;
+  transform: scale(1.05);
+}
+
+.btn-redmine-shining:hover .redmine_logo_original {
+  filter: brightness(0) invert(1);
 }

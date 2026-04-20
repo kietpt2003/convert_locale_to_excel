@@ -14,6 +14,7 @@ import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 import translate from "translate-google";
 import { isHtml } from "cheerio/utils";
+import axios from "axios";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -30,6 +31,8 @@ import translateComplexHtml from "./utils/translateComplexHtml.js";
 import delay from "./utils/delay.js";
 import parseExcelToObjectV2 from "./utils/parseExcelToObject.v2.js";
 import Tunnel from "./models/Tunnel.js";
+import { REDMINE_LOG_TIME_ACTIVITY, REDMINE_TASK_STATUS, REDMINE_TASK_TRACKER_ID } from "./constants/redmine.js";
+import { getTotalLoggedHours } from "./utils/redmineUtils.js";
 
 const app = express();
 const PORT = 3000;
@@ -1237,6 +1240,381 @@ app.get("/get-agent-url", verifyToken, async (req: Request, res: Response) => {
 
   } catch (err) {
     return res.status(404).json({ message: "Server Chat is currently under maintenance or has lost connection." });
+  }
+});
+
+// API Cập nhật cấu hình Redmine
+app.post("/api/user/redmine-config", verifyToken, async (req: any, res: Response) => {
+  try {
+    const { redmineApiKey, redmineUrl, watchedProjectIds, namingTemplate } = req.body;
+    const email = req.user.email; // Lấy từ verifyToken middleware
+
+    const updatedUser = await AuthorizedUser.findOneAndUpdate(
+      { email },
+      {
+        redmineApiKey,
+        redmineUrl,
+        watchedProjectIds,
+        namingTemplate
+      },
+      { new: true, upsert: true }
+    );
+
+    res.json({ message: "Configuration updated successfully", data: updatedUser });
+  } catch (error) {
+    console.error("Redmine Config Error:", error);
+    res.status(500).json({ message: "Failed to save configuration" });
+  }
+});
+
+// API Lấy thông tin cấu hình hiện tại
+app.get("/api/user/me", verifyToken, async (req: any, res: Response) => {
+  try {
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi lấy thông tin user" });
+  }
+});
+
+app.get("/api/redmine/projects", verifyToken, async (req: any, res: Response) => {
+  try {
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user || !user.redmineApiKey || !user.redmineUrl) {
+      return res.status(400).json({ message: "Missing Redmine Configuration" });
+    }
+
+    const response = await axios.get(`${user.redmineUrl}/projects.json`, {
+      headers: { 'X-Redmine-API-Key': user.redmineApiKey }
+    });
+
+    res.json(response.data);
+  } catch (error: any) {
+    console.error("Redmine Proxy Error:", error.message);
+    res.status(500).json({ message: "Không thể kết nối tới Redmine" });
+  }
+});
+
+// 1. Get potential parent tasks from watched projects
+app.get("/api/redmine/scan-parents", verifyToken, async (req: any, res: Response) => {
+  try {
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+
+    if (!user || !user.watchedProjectIds || user.watchedProjectIds.length === 0) {
+      return res.json({ issues: [] });
+    }
+
+    // Lấy ngày hiện tại (định dạng YYYY-MM-DD)
+    const today = new Date().toISOString().split('T')[0];
+
+    // 1. Lấy danh sách các task cha từ các project đang theo dõi
+    const scanPromises = user.watchedProjectIds.map((projectId) =>
+      axios.get(`${user.redmineUrl}/issues.json`, {
+        params: {
+          project_id: projectId,
+          parent_id: "!*",
+          status_id: "open",
+          limit: 20,
+        },
+        headers: { "X-Redmine-API-Key": user.redmineApiKey },
+      })
+    );
+
+    const results = await Promise.all(scanPromises);
+    const allIssues = results.flatMap((response) => response.data.issues);
+
+    // 2. Kiểm tra log time cho từng task
+    // Chúng ta tạo một danh sách các promise để check giờ song song
+    const issuesWithLogCheck = await Promise.all(
+      allIssues.map(async (issue: any) => {
+        const loggedHours = await getTotalLoggedHours(
+          user.redmineUrl,
+          issue.id,
+          today,
+          user.redmineApiKey
+        );
+
+        return {
+          ...issue,
+          currentLoggedHours: loggedHours
+        };
+      })
+    );
+
+    // 3. Lọc: Chỉ giữ lại những task CHƯA ĐỦ 8 tiếng
+    const incompleteTasks = issuesWithLogCheck.filter(
+      (issue) => issue.currentLoggedHours < 8
+    );
+
+    // 4. Sắp xếp lại theo thời gian cập nhật
+    incompleteTasks.sort((a: any, b: any) =>
+      new Date(b.updated_on).getTime() - new Date(a.updated_on).getTime()
+    );
+
+    res.json({ issues: incompleteTasks });
+  } catch (error: any) {
+    console.error("Scan parents error:", error.message);
+    res.status(500).json({ message: "Failed to scan and filter issues from Redmine" });
+  }
+});
+
+app.get("/api/redmine/trackers", verifyToken, (req, res) => {
+  const trackers = Object.values(REDMINE_TASK_TRACKER_ID).map(item => ({
+    id: item.key,
+    name: item.value
+  }));
+
+  res.json(trackers);
+});
+
+// 2. Create the Sub-task
+app.post("/api/redmine/create-subtask", verifyToken, async (req: any, res: Response) => {
+  try {
+    const { parentId, projectId, subject, trackerId } = req.body;
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+
+    if (!user) {
+      res.status(404).json({ message: "User not found." });
+      return;
+    }
+
+    const response = await axios.post(`${user.redmineUrl}/issues.json`, {
+      issue: {
+        project_id: projectId,
+        parent_issue_id: parentId,
+        subject: subject,
+        tracker_id: trackerId || REDMINE_TASK_TRACKER_ID.TASK.key,
+        assigned_to_id: 'me' // Auto-assign to yourself
+      }
+    }, {
+      headers: { 'X-Redmine-API-Key': user.redmineApiKey }
+    });
+
+    res.json({ success: true, issue: response.data.issue });
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to create sub-task" });
+  }
+});
+
+app.get("/api/redmine/monthly-status", verifyToken, async (req: any, res: Response) => {
+  try {
+    const { month, year } = req.query; // Ví dụ: month=4, year=2026
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Tính ngày bắt đầu và kết thúc của tháng
+    const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
+    const toDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0];
+
+    // Lấy toàn bộ time entries trong tháng của user
+    const response = await axios.get(`${user.redmineUrl}/time_entries.json`, {
+      params: {
+        user_id: "me",
+        from: fromDate,
+        to: toDate,
+        limit: 1000 // Lấy hết log trong tháng
+      },
+      headers: { "X-Redmine-API-Key": user.redmineApiKey }
+    });
+
+
+    // Gom nhóm giờ theo ngày
+    const dailyLogs: Record<string, number> = {};
+    response.data.time_entries.forEach((entry: any) => {
+      const date = entry.spent_on;
+      dailyLogs[date] = (dailyLogs[date] || 0) + Number(entry.hours);
+    });
+
+    // Format lại data trả về cho Client
+    // { "2026-04-16": { hours: 8, isFull: true }, ... }
+    const statusMap = Object.keys(dailyLogs).reduce((acc: any, date) => {
+      acc[date] = {
+        hours: dailyLogs[date],
+        isFull: dailyLogs[date] >= 8
+      };
+      return acc;
+    }, {});
+
+    res.json(statusMap);
+  } catch (error: any) {
+    res.status(500).json({ message: "Failed to fetch monthly log status" });
+  }
+});
+
+app.get("/api/redmine/projects/:projectId/tasks", verifyToken, async (req: any, res: Response) => {
+  try {
+    const { projectId } = req.params;
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Gọi API Redmine để lấy các issue được gán cho "me" trong project này
+    const response = await axios.get(`${user.redmineUrl}/issues.json`, {
+      params: {
+        project_id: projectId,
+        assigned_to_id: "me",
+        status_id: "open",
+        limit: 1000,
+        sort: "start_date:desc",
+      },
+      headers: { "X-Redmine-API-Key": user.redmineApiKey },
+    });
+
+    const issues = response.data.issues;
+
+    // 2. Lấy danh sách Unique Parent IDs (loại bỏ null và trùng lặp)
+    const parentIds = [...new Set(issues
+      .filter((i: any) => i.parent && i.parent.id)
+      .map((i: any) => i.parent.id))];
+
+    // 3. Lấy Subject của các task cha (Fetch song song)
+    const parentMap: Record<number, string> = {};
+    if (parentIds.length > 0) {
+      const parentResponses = await Promise.all(
+        parentIds.map(id =>
+          axios.get(`${user.redmineUrl}/issues/${id}.json`, {
+            headers: { "X-Redmine-API-Key": user.redmineApiKey }
+          }).catch(() => null) // Tránh lỗi nếu task cha bị xóa hoặc ko có quyền xem
+        )
+      );
+
+      parentResponses.forEach((res: any) => {
+        if (res && res.data && res.data.issue) {
+          parentMap[res.data.issue.id] = res.data.issue.subject;
+        }
+      });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const tasksWithDetails = await Promise.all(
+      issues.map(async (issue: any) => {
+        const loggedToday = await getTotalLoggedHours(user.redmineUrl, issue.id, today, user.redmineApiKey);
+
+        return {
+          id: issue.id,
+          subject: issue.subject,
+          parent: issue.parent ? {
+            id: issue.parent.id,
+            subject: parentMap[issue.parent.id] || `Task #${issue.parent.id}`
+          } : null,
+          loggedToday: loggedToday,
+          totalSpentHours: issue.spent_hours || 0,
+          startDate: issue.start_date || null
+        };
+      })
+    );
+
+    res.json({ tasks: tasksWithDetails });
+  } catch (error: any) {
+    console.error("Fetch tasks error:", error.message);
+    res.status(500).json({ message: "Failed to fetch tasks for this project" });
+  }
+});
+
+app.post("/api/redmine/logtime", verifyToken, async (req: any, res: Response) => {
+  try {
+    const { issue_id, hours, spent_on, comments } = req.body;
+
+    if (!issue_id || !hours || !spent_on) {
+      return res.status(400).json({ message: "Missing required fields: issue_id, hours, or spent_on" });
+    }
+
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user || !user.redmineApiKey || !user.redmineUrl) {
+      return res.status(401).json({ message: "Redmine configuration not found for this user" });
+    }
+
+    const logData = {
+      time_entry: {
+        issue_id: issue_id,
+        hours: hours,
+        spent_on: spent_on,
+        comments: comments || "",
+        activity_id: REDMINE_LOG_TIME_ACTIVITY.DEVELOPMENT.key,
+      }
+    };
+
+    // 4. Gọi API Redmine
+    const response = await axios.post(
+      `${user.redmineUrl}/time_entries.json`,
+      logData,
+      {
+        headers: {
+          "X-Redmine-API-Key": user.redmineApiKey,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    // 5. Trả về kết quả thành công
+    res.status(201).json({
+      message: "Time logged successfully",
+      data: response.data.time_entry
+    });
+
+  } catch (error: any) {
+    console.error("Log Time Error:", error.response?.data || error.message);
+
+    const redmineErrors = error.response?.data?.errors;
+    let errorMessage = "Failed to log time to Redmine";
+
+    if (Array.isArray(redmineErrors)) {
+      errorMessage = redmineErrors.join("\n");
+    } else if (typeof redmineErrors === 'string') {
+      errorMessage = redmineErrors;
+    }
+
+    res.status(error.response?.status || 500).json({
+      message: errorMessage
+    });
+  }
+});
+
+app.post("/api/redmine/tasks", verifyToken, async (req: any, res: Response) => {
+  try {
+    const { project_id, subject, parent_issue_id, assigned_to_id } = req.body;
+
+    if (!project_id || !subject) {
+      return res.status(400).json({ message: "Project ID and Subject are required" });
+    }
+
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const issueData = {
+      issue: {
+        project_id: project_id,
+        subject: subject,
+        parent_issue_id: parent_issue_id || null,
+        assigned_to_id: assigned_to_id === "me" ? "me" : assigned_to_id,
+        tracker_id: REDMINE_TASK_TRACKER_ID.TASK.key,
+        status_id: REDMINE_TASK_STATUS.NEW.key,
+      }
+    };
+
+    const response = await axios.post(
+      `${user.redmineUrl}/issues.json`,
+      issueData,
+      {
+        headers: {
+          "X-Redmine-API-Key": user.redmineApiKey,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    res.status(201).json(response.data.issue);
+
+  } catch (error: any) {
+    console.error("Create Task Error:", error.response?.data || error.message);
+
+    const redmineErrors = error.response?.data?.errors;
+    const msg = Array.isArray(redmineErrors) ? redmineErrors.join(", ") : "Failed to create task";
+
+    res.status(error.response?.status || 500).json({ message: msg });
   }
 });
 

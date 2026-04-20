@@ -1,0 +1,719 @@
+:root {
+  --primary: #2c3e50;
+  --success: #27ae60;
+  --danger: #e74c3c;
+  --warning: #f1c40f;
+  --bg: #f4f7f6;
+  --border: #ddd;
+  --white: #ffffff;
+}
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: var(--bg);
+  margin: 0;
+  padding: 20px;
+  color: #333;
+}
+
+.container {
+  max-width: 1300px;
+  margin: auto;
+}
+
+/* Layout Grid chính */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 25px;
+}
+
+/* Card Style */
+.card {
+  background: var(--white);
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+}
+
+h3 {
+  margin-top: 0;
+  border-bottom: 2px solid var(--bg);
+  padding-bottom: 12px;
+  color: var(--primary);
+  font-size: 1.2rem;
+}
+
+/* Form elements */
+label {
+  display: block;
+  margin-top: 15px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border 0.3s;
+}
+
+input:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  transition: opacity 0.2s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+.btn-save {
+  background: var(--primary);
+  color: white;
+  width: 100%;
+  margin-top: 10px;
+}
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-confirm {
+  background: var(--success);
+  color: white;
+  font-size: 0.85rem;
+}
+
+/* Project Select List */
+.project-list {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  padding: 12px;
+  background: #fafafa;
+  border-radius: 6px;
+}
+
+/* Project Tree Styling */
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f9f9f9;
+}
+
+.project-item.child {
+  margin-left: 25px; /* Indent for children */
+  border-left: 2px solid #eee;
+  padding-left: 10px;
+}
+
+.project-item span {
+  font-size: 0.9rem;
+}
+
+.parent-label {
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.child-label {
+  color: #555;
+}
+
+.project-item:last-child {
+  border-bottom: none;
+}
+.project-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+/* Pending Queue Table */
+.table-wrapper {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+th {
+  background: #f8f9fa;
+  font-size: 0.9rem;
+  color: #666;
+}
+th,
+td {
+  text-align: left;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.editable-input {
+  border: 1px dashed var(--warning) !important;
+  background: #fffdf0;
+  margin: 0 !important;
+}
+
+/* Calendar Grid */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.day-header {
+  font-weight: bold;
+  padding: 10px;
+  background: var(--primary);
+  color: white;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.day-cell {
+  min-height: 100px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.day-cell.weekend {
+  background: #f1f1f1;
+  color: #999;
+  border-style: dashed;
+}
+
+.day-number {
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+.low-time {
+  background: var(--danger);
+}
+.full-time {
+  background: var(--success);
+}
+
+.time-label {
+  font-size: 0.85rem;
+  font-weight: bold;
+  background: #f8f9fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+/* Core Layout Improvements */
+.main-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 15px 25px;
+  background: var(--white);
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-left h1 {
+  font-size: 1.4rem;
+  color: var(--primary);
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.btn-home {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #666;
+  padding: 8px 15px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  border: 1px solid #eee;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.btn-home:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.btn-home svg {
+  transition: transform 0.2s ease;
+}
+
+.btn-home:hover svg {
+  transform: scale(1.1);
+}
+
+/* User Display Badge */
+.user-info-badge {
+  display: flex;
+  align-items: center;
+  background: #f0f7ff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid #d1e9ff;
+  color: #007bff;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.user-info-badge::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #28a745; /* Trạng thái online */
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+/* Card Header with Buttons */
+.flex-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px !important;
+}
+
+.card-header h3 {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Buttons */
+.btn-action {
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  transition: all 0.2s ease;
+}
+
+.btn-scan {
+  background: var(--success);
+  color: white;
+}
+
+.btn-scan:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* Template Hint */
+.template-hint {
+  background: #f8f9fa;
+  padding: 8px;
+  border-radius: 4px;
+  margin-top: 5px;
+  font-size: 0.75rem;
+  color: #666;
+  border: 1px solid #eee;
+}
+
+/* Empty States & Table */
+.empty-table,
+.empty-state {
+  text-align: center;
+  color: #999;
+  padding: 40px !important;
+  font-style: italic;
+}
+
+.project-list {
+  background: #fdfdfd;
+  border: 1px solid #eaeaea;
+}
+
+/* Enhanced Table */
+table thead th {
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 12px 15px;
+}
+
+table tbody tr:hover {
+  background-color: #fcfcfc;
+}
+
+/* Calendar Refinement */
+.calendar-wrapper {
+  background: #fcfcfc;
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.day-cell {
+  transition: transform 0.1s ease;
+  cursor: pointer;
+}
+
+.day-cell:hover:not(.weekend) {
+  border-color: var(--primary);
+  background: #fff;
+}
+
+.day-num {
+  font-size: 0.9rem;
+  color: #888;
+}
+
+/* Cố định chiều cao vùng chứa bảng */
+.table-wrapper {
+  max-height: 400px; /* Bạn có thể điều chỉnh con số này */
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+/* Giữ header đứng yên khi scroll (Sticky Header) */
+table thead th {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 10;
+  box-shadow: inset 0 -1px 0 #eee;
+}
+
+/* Style cho badge tên Author cho đẹp */
+.author-badge {
+  background: #e1f5fe;
+  color: #0288d1;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+/* Calendar Container */
+.calendar-controls {
+  display: flex;
+  align-items: center; /* Căn giữa theo chiều dọc */
+  justify-content: flex-start; /* Đẩy sát sang trái */
+  gap: 8px; /* Khoảng cách giữa nút và chữ */
+  background: #f1f3f4; /* Màu nền nhẹ cho cụm điều hướng (tùy chọn) */
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.calendar-card {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+}
+
+.calendar-nav {
+  background: #ffffff;
+  padding: 1.5rem;
+  border-bottom: 1px solid #edf2f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.month-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #3c4043;
+  white-space: nowrap;
+}
+
+/* Header thứ trong tuần */
+.calendar-weekday-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #f8fafc;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.calendar-weekday-header div {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Grid ngày */
+.calendar-days-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: #edf2f7; /* Màu đường kẻ */
+  gap: 1px; /* Tạo line giữa các ô */
+}
+
+.day-cell {
+  background: #ffffff;
+  min-height: 110px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.day-cell:hover {
+  background: #f7fafc;
+  z-index: 2;
+  box-shadow: inset 0 0 0 2px #4299e1;
+}
+
+.day-number {
+  font-weight: 600;
+  color: #4a5568;
+  font-size: 0.9rem;
+  margin-bottom: 8px;
+}
+
+/* Trạng thái Log Time */
+.status-full {
+  background-color: #f0fff4; /* Xanh lá cực nhẹ */
+}
+.status-full .hours-badge {
+  background: #48bb78;
+  color: white;
+}
+
+.status-incomplete {
+  background-color: #fff5f5; /* Đỏ cực nhẹ */
+}
+.status-incomplete .hours-badge {
+  background: #f56565;
+  color: white;
+}
+
+.hours-badge {
+  margin-top: auto;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-weight: 700;
+  width: fit-content;
+  align-self: flex-end;
+}
+
+/* Navigation Buttons */
+.btn-icon {
+  background: #edf2f7;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #4a5568;
+}
+
+.btn-icon:hover {
+  background: #e2e8f0;
+}
+
+select {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  margin-left: 5px;
+}
+select:disabled {
+  background-color: #edf2f7;
+  cursor: not-allowed;
+  color: #a0aec0;
+}
+
+.month-stats {
+  flex: 1;
+  margin: 0 30px;
+  max-width: 350px;
+}
+
+.stats-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.stats-label {
+  color: #718096;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.stats-value {
+  color: #2d3748;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #edf2f7;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%; /* Sẽ update bằng JS */
+  background-color: #4299e1;
+  transition:
+    width 0.5s ease-out,
+    background-color 0.3s;
+}
+
+/* Responsive một chút */
+@media (max-width: 900px) {
+  .month-stats {
+    display: none;
+  }
+}
+
+.current-date-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  user-select: none;
+}
+
+.current-date-selector:hover {
+  background: #e8eaed;
+}
+
+.styled-select {
+  border: 1px solid #e2e8f0;
+  background: white;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-right: 5px;
+}
+
+.styled-select:hover {
+  border-color: #cbd5e0;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+.modal-content {
+  background: white;
+  margin: 10% auto;
+  padding: 20px;
+  width: 400px;
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+.close-modal {
+  cursor: pointer;
+  font-size: 24px;
+  color: #aaa;
+}
+.task-selector-group {
+  display: flex;
+  gap: 8px;
+}
+.btn-small-plus {
+  background: #4299e1;
+  color: white;
+  width: 42px;
+  border-radius: 6px;
+  font-size: 1.2rem;
+}
+
+#modalTaskSelect {
+  font-family: "Cascadia Code", "Courier New", monospace;
+  font-size: 13px;
+  color: #2d3748;
+}
+
+#modalTaskSelect option {
+  background-color: #fff;
+  padding: 5px;
+}
+
+/* Thêm màu sắc nhẹ cho các ô clickable */
+.clickable-slot:hover {
+  background-color: #ebf8ff !important;
+  cursor: pointer;
+  border: 1px solid #4299e1;
+}
+
+#modalTaskSelect {
+  font-family: "Consolas", "Monaco", "Courier New", monospace;
+  line-height: 1.5;
+}
+
+/* Chrome/Safari không hỗ trợ style cho option nhiều, 
+   nhưng thụt lề bằng Space ( ) vẫn hoạt động rất tốt */
+#modalTaskSelect option {
+  padding: 8px 0;
+  border-bottom: 1px solid #edf2f7;
+}

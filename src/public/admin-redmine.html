@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redmine Automation Tool</title>
+    <link rel="stylesheet" href="/css/style-redmine.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="main-header">
+        <div class="header-left">
+          <a href="/index.html" class="btn-home" title="Back to Home">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span>Home</span>
+          </a>
+          <h1>Redmine Automation Portal</h1>
+        </div>
+
+        <div class="header-right">
+          <div id="user-display" class="user-info-badge"></div>
+        </div>
+      </header>
+
+      <div class="dashboard-grid">
+        <aside>
+          <div class="card">
+            <div class="card-header">
+              <h3>⚙️ Setup</h3>
+            </div>
+
+            <label>Redmine URL</label>
+            <input
+              type="text"
+              id="redmineUrl"
+              placeholder="https://redmine.company.com"
+            />
+
+            <label>API Key</label>
+            <input
+              type="password"
+              id="redmineApiKey"
+              placeholder="Enter API access key..."
+            />
+
+            <label>Watched Projects</label>
+            <div class="project-list" id="projectList">
+              <div class="empty-state">No projects loaded</div>
+            </div>
+
+            <label>Naming Template</label>
+            <input
+              type="text"
+              id="format"
+              value="[PROJECT] | [PARENT] | Working"
+            />
+            <div class="template-hint">
+              <span><b>Tags:</b> [PROJECT], [PARENT], [DATE]</span>
+            </div>
+
+            <button class="btn-save" id="btnSaveConfig">
+              Save Configuration
+            </button>
+          </div>
+        </aside>
+
+        <main>
+          <div class="card">
+            <div class="card-header flex-header">
+              <h3>⏳ Sub-task Approval</h3>
+              <button class="btn-action btn-scan" onclick="scanForTasks()">
+                🔍 Scan New Tasks
+              </button>
+            </div>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th width="15%">Project</th>
+                    <th width="15%">Author</th>
+                    <th width="25%">Parent Task</th>
+                    <th width="12%">Tracker</th>
+                    <th width="35%">Draft Sub-task</th>
+                    <th width="10%">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="pendingQueue">
+                  <tr>
+                    <td colspan="4" class="empty-table">
+                      Click "Scan" to find tasks from your boss.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card calendar-card">
+            <div class="card-header calendar-nav">
+              <div class="nav-left">
+                <div class="calendar-controls">
+                  <button id="prevMonth" class="btn-icon">❮</button>
+
+                  <div class="current-date-selector" id="datePickerTrigger">
+                    <span id="currentMonthYear" class="month-label"
+                      >April 2026</span
+                    >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M7 10l5 5 5-5z"></path>
+                    </svg>
+                  </div>
+
+                  <button id="nextMonth" class="btn-icon">❯</button>
+                </div>
+              </div>
+
+              <div class="nav-center month-stats">
+                <div class="stats-info">
+                  <span class="stats-label">Monthly Progress:</span>
+                  <span id="monthTotalProgress" class="stats-value"
+                    >0 / 0h</span
+                  >
+                </div>
+                <div class="progress-bar-container">
+                  <div id="monthProgressBar" class="progress-fill"></div>
+                </div>
+              </div>
+
+              <div class="nav-right">
+                <div class="quick-selectors">
+                  <select id="selectMonth" class="styled-select"></select>
+                  <select id="selectYear" class="styled-select"></select>
+                </div>
+                <button id="btnToday" class="btn-secondary">Today</button>
+              </div>
+            </div>
+            <div class="calendar-container">
+              <div class="calendar-weekday-header">
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+                <div>Sun</div>
+              </div>
+              <div class="calendar-days-grid" id="calendarGrid"></div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div id="logTimeModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Log Time - April 20, 2026</h3>
+          <span class="close-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+          <label>Project</label>
+          <select id="modalProjectSelect">
+            <option value="">-- Select Project --</option>
+          </select>
+
+          <label>Task</label>
+          <div class="task-selector-group">
+            <select id="modalTaskSelect">
+              <option value="">-- Select Task --</option>
+            </select>
+            <button
+              id="btnCreateTask"
+              class="btn-small-plus"
+              title="Create New Task"
+            >
+              +
+            </button>
+          </div>
+
+          <label>Hours</label>
+          <input
+            type="number"
+            id="modalHours"
+            min="0.5"
+            max="8"
+            step="0.5"
+            value="8"
+          />
+
+          <button id="btnSubmitLog" class="btn-save">Submit Log</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { initApp, scanForTasks } from "/js/redmine.js";
+      window.scanForTasks = scanForTasks;
+      document.addEventListener("DOMContentLoaded", initApp);
+    </script>
+  </body>
+</html>
