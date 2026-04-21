@@ -7,7 +7,7 @@ const getAuthHeaders = () => ({
 // --- LOAD LANGUAGES ---
 export async function loadLanguages() {
   try {
-    const res = await fetch("/languages", { headers: getAuthHeaders() });
+    const res = await fetch("/api/languages", { headers: getAuthHeaders() });
     if (!res.ok) return;
     const langs = await res.json();
 
@@ -70,7 +70,7 @@ export function initLanguageEvents() {
       btn.textContent = "Adding...";
 
       try {
-        const res = await fetch("/admin/languages", {
+        const res = await fetch("/api/languages/admin", {
           method: "POST",
           headers: getAuthHeaders(),
           body: JSON.stringify({ code, name }),
@@ -94,7 +94,7 @@ export function initLanguageEvents() {
       return;
 
     try {
-      const res = await fetch(`/admin/languages/${code}`, {
+      const res = await fetch(`/api/languages/admin/${code}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
       });

@@ -164,7 +164,7 @@ export async function streamAgentReply(
     // =========================================================
     // 1. GỌI API ĐỂ LẤY URL CỦA CHAT AGENT
     // =========================================================
-    const urlResponse = await fetch("/get-agent-url", {
+    const urlResponse = await fetch("/api/agent/get-agent-url", {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

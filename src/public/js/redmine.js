@@ -36,7 +36,7 @@ export async function initApp() {
 // 1. Load configuration from MongoDB
 export async function loadUserData() {
   try {
-    const res = await fetch(`/api/user/me`, {
+    const res = await fetch(`/api/redmine/user/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const user = await res.json();
@@ -74,7 +74,7 @@ export async function saveRedmineConfig() {
   const watchedProjectIds = Array.from(checkedBoxes).map((cb) => cb.value);
 
   try {
-    const res = await fetch(`/api/user/redmine-config`, {
+    const res = await fetch(`/api/redmine/user/redmine-config`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -125,7 +125,7 @@ export async function fetchRedmineProjects(selectedIds = []) {
   }
 }
 
-function buildProjectTree(projects) {
+export function buildProjectTree(projects) {
   const projectMap = {};
   const tree = [];
 

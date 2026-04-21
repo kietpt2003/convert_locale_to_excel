@@ -1,4 +1,5 @@
 import { renderCalendar } from "./calendar.js";
+import { buildProjectTree } from "./redmine.js";
 
 let orderedTasks = [];
 
@@ -100,20 +101,19 @@ export async function fetchTasksByProject(projectId) {
   }
 }
 
-// Thêm vào logic khởi tạo modal của bạn
+// Init logic modal log time
 export function initModalEvents() {
   const pSelect = document.getElementById("modalProjectSelect");
   const btnSubmit = document.getElementById("btnSubmitLog");
   const btnClose = document.querySelector(".close-modal");
   const modal = document.getElementById("logTimeModal");
 
-  // Sự kiện thay đổi Project
+  // Listening on change project event
   pSelect.onchange = (e) => {
     const projectId = e.target.value;
     fetchTasksByProject(projectId);
   };
 
-  // Kiểm tra trước khi submit
   btnSubmit.onclick = async () => {
     const taskId = document.getElementById("modalTaskSelect").value;
     const hours = document.getElementById("modalHours").value;
@@ -167,6 +167,7 @@ export function initModalEvents() {
   };
 }
 
+//Load and render list projects
 export async function loadModalProjects() {
   const pSelect = document.getElementById("modalProjectSelect");
   const token = localStorage.getItem("app_token");
@@ -177,16 +178,39 @@ export async function loadModalProjects() {
     });
     const data = await res.json();
 
-    // Chỉ lấy các project phẳng (hoặc đã xử lý tree) để đưa vào dropdown select
     pSelect.innerHTML = '<option value="">-- Select Project --</option>';
-    data.projects.forEach((p) => {
-      const option = document.createElement("option");
-      option.value = p.id;
-      option.innerText = p.name;
-      pSelect.appendChild(option);
-    });
+
+    if (data.projects && data.projects.length > 0) {
+      const projectTree = buildProjectTree(data.projects);
+
+      const renderOptions = (projects, level = 0) => {
+        projects.forEach((p) => {
+          const option = document.createElement("option");
+          option.value = p.id;
+
+          const indent = "\u00A0".repeat(level * 4);
+          const prefix = level === 0 ? "📂 " : "";
+
+          option.innerText = `${indent}${prefix}[${p.id}] ${p.name}`;
+
+          if (level === 0) {
+            option.style.fontWeight = "bold";
+            option.style.backgroundColor = "#f8f9fa";
+          }
+
+          pSelect.appendChild(option);
+
+          if (p.children && p.children.length > 0) {
+            renderOptions(p.children, level + 1);
+          }
+        });
+      };
+
+      renderOptions(projectTree);
+    }
   } catch (err) {
     console.error("Load modal projects error:", err);
+    pSelect.innerHTML = '<option value="">Error loading projects</option>';
   }
 }
 
@@ -204,7 +228,7 @@ document.getElementById("btnCreateTask").onclick = async () => {
   const selectedTaskData = orderedTasks.find((t) => t.id == selectedTaskId);
 
   let parentId = null;
-  let promptMsg = "Nhập tiêu đề Task mới:";
+  let promptMsg = "Input task title:";
 
   if (selectedTaskId) {
     // Nếu đang chọn một task, mặc định hiểu là muốn tạo sub-task cho nó
@@ -212,12 +236,12 @@ document.getElementById("btnCreateTask").onclick = async () => {
       ? selectedTaskData.subject
       : selectedTaskId;
     const confirmSub = confirm(
-      `Bạn đang chọn task #${selectedTaskId}.\n\nBạn muốn tạo SUB-TASK cho task này phải không?\n(Nhấn Cancel để tạo Task Cha độc lập)`,
+      `You're selected task #${selectedTaskId}.\n\nAre you going to create SUB-TASK for this task?\n(Press Cancel to create Task seperately)`,
     );
 
     if (confirmSub) {
       parentId = selectedTaskId;
-      promptMsg = `Nhập tiêu đề Sub-task cho [#${selectedTaskId}]:`;
+      promptMsg = `Input Sub-task title for [#${selectedTaskId}]:`;
     }
   }
 
@@ -235,18 +259,18 @@ document.getElementById("btnCreateTask").onclick = async () => {
       body: JSON.stringify({
         project_id: projectId,
         subject: taskSubject,
-        parent_issue_id: parentId, // Truyền ID task cha nếu là sub-task
-        assigned_to_id: "me", // Tự gán cho chính mình
+        parent_issue_id: parentId,
+        assigned_to_id: "me",
       }),
     });
 
     if (res.ok) {
       const newTask = await res.json();
       alert(`Đã tạo ${parentId ? "Sub-task" : "Task"} thành công!`);
-      await fetchTasksByProject(projectId); // Refresh danh sách
-      document.getElementById("modalTaskSelect").value = newTask.id; // Chọn luôn task vừa tạo
+      await fetchTasksByProject(projectId); // Refresh tasks list
+      document.getElementById("modalTaskSelect").value = newTask.id; // Select task just created
     }
   } catch (err) {
-    alert("Lỗi khi tạo task");
+    alert("Create task failed. Please try again later");
   }
 };
