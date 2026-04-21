@@ -7,7 +7,7 @@ import { getTotalLoggedHours } from '../utils/redmineUtils.js';
 
 export const logTime = async (req: any, res: Response) => {
   try {
-    const { issue_id, hours, spent_on, comments } = req.body;
+    const { issue_id, hours, spent_on, comments, activity_id } = req.body;
 
     if (!issue_id || !hours || !spent_on) {
       return res.status(400).json({ message: "Missing required fields: issue_id, hours, or spent_on" });
@@ -24,7 +24,7 @@ export const logTime = async (req: any, res: Response) => {
         hours: hours,
         spent_on: spent_on,
         comments: comments || "",
-        activity_id: REDMINE_LOG_TIME_ACTIVITY.DEVELOPMENT.key,
+        activity_id: activity_id || REDMINE_LOG_TIME_ACTIVITY.DEVELOPMENT.key,
       }
     };
 
@@ -78,6 +78,7 @@ export const getTasks = async (req: any, res: Response) => {
         status_id: "open",
         limit: 1000,
         sort: "start_date:desc",
+        include: "custom_fields"
       },
       headers: { "X-Redmine-API-Key": user.redmineApiKey },
     });
@@ -119,7 +120,8 @@ export const getTasks = async (req: any, res: Response) => {
           } : null,
           loggedToday: loggedToday,
           totalSpentHours: issue.spent_hours || 0,
-          startDate: issue.start_date || null
+          startDate: issue.start_date || null,
+          custom_fields: issue.custom_fields || []
         };
       })
     );
@@ -192,6 +194,46 @@ export const getTaskPriorities = async (req: any, res: Response) => {
     res.json({ priorities: activePriorities });
   } catch (error: any) {
     console.error("Fetch Priorities Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch issue priorities" });
+  }
+}
+
+export const getTaskActivities = async (req: any, res: Response) => {
+  try {
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const response = await axios.get(`${user.redmineUrl}/enumerations/time_entry_activities.json`, {
+      headers: {
+        "X-Redmine-API-Key": user.redmineApiKey,
+        "Content-Type": "application/json"
+      },
+    });
+
+    const activeActivities = response.data.time_entry_activities.filter((p: any) => p.active);
+
+    res.json({ activities: activeActivities });
+  } catch (error: any) {
+    console.error("Fetch Activities Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch issue priorities" });
+  }
+}
+
+export const getTaskStatuses = async (req: any, res: Response) => {
+  try {
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const response = await axios.get(`${user.redmineUrl}/issue_statuses.json`, {
+      headers: {
+        "X-Redmine-API-Key": user.redmineApiKey,
+        "Content-Type": "application/json"
+      },
+    });
+
+    res.json({ statuses: response.data.issue_statuses });
+  } catch (error: any) {
+    console.error("Fetch Activities Error:", error.message);
     res.status(500).json({ message: "Failed to fetch issue priorities" });
   }
 }
