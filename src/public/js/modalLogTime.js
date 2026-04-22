@@ -413,14 +413,11 @@ document.getElementById("btnCancelCreate").onclick = () => {
   document.getElementById("createTaskForm").style.display = "none";
 };
 
-// Hàm đổ dữ liệu vào Epic Type Select dựa trên Task cha đang được chọn
 async function loadEpicTypeOptions(selectedTaskId) {
   const epicSelect = document.getElementById("modalEpicTypeSelect");
   epicSelect.innerHTML = '<option value="">-- Select Epic Type --</option>';
 
-  // Tìm dữ liệu của task đang chọn trong danh sách orderedTasks (đã có custom_fields từ API getTasks)
   const taskData = orderedTasks.find((t) => t.id == selectedTaskId);
-  console.log("check data", orderedTasks);
 
   if (taskData && taskData.custom_fields) {
     const epicField = taskData.custom_fields.find(

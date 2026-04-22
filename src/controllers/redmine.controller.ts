@@ -71,44 +71,63 @@ export const getTasks = async (req: any, res: Response) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const response = await axios.get(`${user.redmineUrl}/issues.json`, {
-      params: {
-        project_id: projectId,
-        assigned_to_id: "me",
-        status_id: "open",
-        limit: 1000,
-        sort: "start_date:desc",
-        include: "custom_fields"
-      },
-      headers: { "X-Redmine-API-Key": user.redmineApiKey },
+    const commonParams = {
+      project_id: projectId,
+      status_id: "open",
+      limit: 1000,
+      include: "custom_fields",
+    };
+
+    const [parentRes, myTasksRes] = await Promise.all([
+      axios.get(`${user.redmineUrl}/issues.json`, {
+        params: { ...commonParams, parent_id: "!*" },
+        headers: { "X-Redmine-API-Key": user.redmineApiKey },
+      }),
+      axios.get(`${user.redmineUrl}/issues.json`, {
+        params: { ...commonParams, assigned_to_id: "me" },
+        headers: { "X-Redmine-API-Key": user.redmineApiKey },
+      }),
+    ]);
+
+    const parentIssues = parentRes.data.issues;
+    const myIssues = myTasksRes.data.issues;
+
+    const combinedIssues = [...parentIssues];
+    myIssues.forEach((myIssue: any) => {
+      if (!combinedIssues.find((p) => p.id === myIssue.id)) {
+        combinedIssues.push(myIssue);
+      }
     });
 
-    const issues = response.data.issues;
-
-    const parentIds = [...new Set(issues
+    const extraParentIds = [...new Set(combinedIssues
       .filter((i: any) => i.parent && i.parent.id)
       .map((i: any) => i.parent.id))];
 
     const parentMap: Record<number, string> = {};
-    if (parentIds.length > 0) {
-      const parentResponses = await Promise.all(
-        parentIds.map(id =>
+    combinedIssues.forEach(i => {
+      parentMap[i.id] = i.subject;
+    });
+
+    const missingParentIds = extraParentIds.filter(id => !parentMap[id]);
+    if (missingParentIds.length > 0) {
+      const missingResponses = await Promise.all(
+        missingParentIds.map(id =>
           axios.get(`${user.redmineUrl}/issues/${id}.json`, {
             headers: { "X-Redmine-API-Key": user.redmineApiKey }
           }).catch(() => null)
         )
       );
-
-      parentResponses.forEach((res: any) => {
-        if (res && res.data && res.data.issue) {
-          parentMap[res.data.issue.id] = res.data.issue.subject;
+      missingResponses.forEach((r: any) => {
+        if (r?.data?.issue) {
+          parentMap[r.data.issue.id] = r.data.issue.subject;
         }
       });
     }
 
     const today = new Date().toISOString().split('T')[0];
+
     const tasksWithDetails = await Promise.all(
-      issues.map(async (issue: any) => {
+      combinedIssues.map(async (issue: any) => {
         const loggedToday = await getTotalLoggedHours(user.redmineUrl, issue.id, today, user.redmineApiKey);
 
         return {
@@ -126,10 +145,12 @@ export const getTasks = async (req: any, res: Response) => {
       })
     );
 
+    tasksWithDetails.sort((a, b) => (b.id - a.id));
+
     res.json({ tasks: tasksWithDetails });
   } catch (error: any) {
-    console.error("Fetch tasks error:", error.message);
-    res.status(500).json({ message: "Failed to fetch tasks for this project" });
+    console.error("Fetch combined tasks error:", error.message);
+    res.status(500).json({ message: "Failed to fetch tasks" });
   }
 };
 
