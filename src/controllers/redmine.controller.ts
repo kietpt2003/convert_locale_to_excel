@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import axios from 'axios';
 
-import { REDMINE_LOG_TIME_ACTIVITY, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
+import { REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
 import { getTotalLoggedHours } from '../utils/redmineUtils.js';
 
@@ -407,7 +407,12 @@ export const getListProjects = async (req: any, res: Response) => {
     }
 
     const response = await axios.get(`${user.redmineUrl}/projects.json`, {
-      headers: { 'X-Redmine-API-Key': user.redmineApiKey }
+      headers: { 'X-Redmine-API-Key': user.redmineApiKey },
+      params: {
+        status: REDMINE_PROJECT_STATUS.ACTIVE,
+        limit: 1000,
+        sort: "name:asc"
+      },
     });
 
     res.json(response.data);

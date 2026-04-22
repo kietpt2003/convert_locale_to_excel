@@ -114,3 +114,8 @@ export const REDMINE_TASK_STATUS = {
     value: "New"
   }
 }
+export const REDMINE_PROJECT_STATUS = {
+  ACTIVE: 1,
+  CLOSED: 5,
+  ARCHIVED: 9
+}
