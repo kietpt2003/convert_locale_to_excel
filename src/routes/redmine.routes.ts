@@ -33,6 +33,6 @@ router.get('/trackers', getTaskTrackers);
 router.get('/scan-parents', getTaskParents);
 router.get('/projects', getListProjects);
 router.get('/user/me', getUserInfo);
-router.get('/user/redmine-config', getRedmineConfig);
+router.post('/user/redmine-config', getRedmineConfig);
 
 export default router;
