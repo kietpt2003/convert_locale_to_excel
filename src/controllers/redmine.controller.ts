@@ -270,36 +270,61 @@ export const getMonthlyHours = async (req: any, res: Response) => {
     const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const toDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0];
 
-    const response = await axios.get(`${user.redmineUrl}/time_entries.json`, {
-      params: {
-        user_id: "me",
-        from: fromDate,
-        to: toDate,
-        limit: 1000
-      },
+    const timeEntriesRes = await axios.get(`${user.redmineUrl}/time_entries.json`, {
+      params: { user_id: "me", from: fromDate, to: toDate, limit: 1000 },
       headers: { "X-Redmine-API-Key": user.redmineApiKey }
     });
 
+    const entries = timeEntriesRes.data.time_entries;
+    const issueIds = [...new Set(entries.map((e: any) => e.issue?.id).filter((id: any) => id))];
 
-    // Merge by date
-    const dailyLogs: Record<string, number> = {};
-    response.data.time_entries.forEach((entry: any) => {
+    const issueMap: Record<number, string> = {};
+
+    if (issueIds.length > 0) {
+      const issuesRes = await axios.get(`${user.redmineUrl}/issues.json`, {
+        params: { issue_id: issueIds.join(','), limit: 100 },
+        headers: { "X-Redmine-API-Key": user.redmineApiKey }
+      });
+
+      issuesRes.data.issues.forEach((is: any) => {
+        issueMap[is.id] = is.subject;
+      });
+    }
+
+    const dailyData: Record<string, any> = {};
+
+    entries.forEach((entry: any) => {
       const date = entry.spent_on;
-      dailyLogs[date] = (dailyLogs[date] || 0) + Number(entry.hours);
+      if (!dailyData[date]) {
+        dailyData[date] = { totalHours: 0, logs: [] };
+      }
+
+      dailyData[date].logs.push({
+        id: entry.id,
+        hours: entry.hours,
+        comments: entry.comments,
+        project: entry.project ? entry.project.name : "N/A",
+        issueId: entry.issue ? entry.issue.id : null,
+        issueName: entry.issue ? (issueMap[entry.issue.id] || "Unknown Task") : "N/A",
+        activity: entry.activity ? entry.activity.name : "N/A",
+      });
+
+      dailyData[date].totalHours += Number(entry.hours);
     });
 
-    // Format data and return to Client
-    // { "2026-04-16": { hours: 8, isFull: true }, ... }
-    const statusMap = Object.keys(dailyLogs).reduce((acc: any, date) => {
+    const result = Object.keys(dailyData).reduce((acc: any, date) => {
       acc[date] = {
-        hours: dailyLogs[date],
-        isFull: dailyLogs[date] >= 8
+        totalHours: dailyData[date].totalHours,
+        isFull: dailyData[date].totalHours >= 8,
+        logs: dailyData[date].logs,
+        redmineUrl: user.redmineUrl
       };
       return acc;
     }, {});
 
-    res.json(statusMap);
+    res.json(result);
   } catch (error: any) {
+    console.error(error);
     res.status(500).json({ message: "Failed to fetch monthly log status" });
   }
 }
