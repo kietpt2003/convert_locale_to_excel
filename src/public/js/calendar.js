@@ -18,9 +18,9 @@ export async function renderCalendar() {
 
   if (!grid || !monthLabel) return;
 
-  const monthName = currentViewDate.toLocaleString("en-US", { month: "long" });
   const month = currentViewDate.getMonth() + 1;
   const year = currentViewDate.getFullYear();
+  const monthName = currentViewDate.toLocaleString("en-US", { month: "long" });
 
   monthLabel.innerText = `${monthName}, ${year}`;
   grid.innerHTML = '<div style="padding: 20px;">Loading data...</div>';
@@ -29,80 +29,107 @@ export async function renderCalendar() {
     const token = localStorage.getItem("app_token");
     const response = await fetch(
       `/api/redmine/monthly-status?month=${month}&year=${year}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     const statusData = await response.json();
 
-    let totalLogged = 0;
-    Object.values(statusData).forEach((day) => {
-      totalLogged += Number(day.hours || 0);
-    });
+    updateProgressStats(statusData, year, month);
 
-    const maxHours = calculateMaxWorkingHours(year, month);
-    const percentage = Math.min((totalLogged / maxHours) * 100, 100);
-
-    // CẬP NHẬT UI STATS
-    const progressText = document.getElementById("monthTotalProgress");
-    const progressBar = document.getElementById("monthProgressBar");
-
-    if (progressText && progressBar) {
-      progressText.innerText = `${totalLogged} / ${maxHours}h`;
-      progressBar.style.width = `${percentage}%`;
-
-      // Đổi màu nếu hoàn thành tốt
-      if (percentage >= 100) {
-        progressBar.style.backgroundColor = "#27ae60";
-      } else if (percentage > 50) {
-        progressBar.style.backgroundColor = "#2ecc71";
-      } else {
-        progressBar.style.backgroundColor = "#f1c40f";
-      }
-    }
-
-    // Logic tính toán ngày
     const firstDayOfMonth = new Date(year, month - 1, 1).getDay();
     const daysInMonth = new Date(year, month, 0).getDate();
-
-    // Điều chỉnh Thứ 2 là đầu tuần (Redmine/VN style)
     let startOffset = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
 
-    grid.innerHTML = "";
+    grid.innerHTML = ""; // Remove "Loading..."
+    const fragment = document.createDocumentFragment();
 
-    // 1. Render ô trống của tháng trước
     for (let i = 0; i < startOffset; i++) {
-      grid.innerHTML += `<div class="day-cell empty" style="background: #f9f9f9;"></div>`;
+      const emptyCell = document.createElement("div");
+      emptyCell.className = "day-cell empty";
+      fragment.appendChild(emptyCell);
     }
 
-    // 2. Render ngày trong tháng
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       const dayData = statusData[dateStr];
-      const isFull = dayData && dayData.hours >= 8;
-      const clickableClass = !isFull ? "clickable-slot" : "";
+      const redminUrl = dayData?.redmineUrl || "";
 
-      let statusClass = "";
-      let hoursHtml = "";
+      const dayCell = document.createElement("div");
+      const clickableClass = !dayData?.isFull ? "clickable-slot" : "";
+      dayCell.className = `day-cell ${dayData?.isFull ? "status-full" : "status-incomplete"} ${clickableClass}`;
+
+      const htmlBuffer = [];
+      htmlBuffer.push(
+        `<div class="day-header"><span class="day-number">${day}</span>`,
+      );
 
       if (dayData) {
-        statusClass = dayData.isFull ? "status-full" : "status-incomplete";
-        hoursHtml = `<span class="hours-badge">${dayData.hours}h</span>`;
+        htmlBuffer.push(
+          `<span class="hours-badge">${Number(dayData.totalHours).toFixed(1)}h</span>`,
+        );
       }
 
-      grid.innerHTML += `
-        <div class="day-cell ${statusClass} ${clickableClass}" 
-            onclick="${!isFull ? `openLogModal('${dateStr}', ${dayData?.hours || 0})` : ""}">
-          <span class="day-number">${day}</span>
-          ${hoursHtml}
+      htmlBuffer.push(`</div><div class="log-list-container">`);
+
+      if (dayData?.logs?.length > 0) {
+        const redmineBaseUrl = `${dayData.redmineUrl}/issues`; // Dùng URL lấy từ Backend
+
+        for (let i = 0; i < dayData.logs.length; i++) {
+          const log = dayData.logs[i];
+          const safeComment = log.comments ? log.comments : "No comment";
+
+          // Tooltip giữ nguyên để hiển thị khi cần
+          const tooltipText = `Project: ${log.project} | Task: #${log.issueId} - ${log.issueName}`;
+
+          htmlBuffer.push(`
+      <div class="log-item" data-comment="${tooltipText}">
+        <div class="log-row-main">
+            <span class="log-project">${log.project}</span>
+            <span class="log-hours"><strong>${log.hours}h</strong></span>
         </div>
-      `;
+        <div class="log-row-sub">
+            <a href="${redmineBaseUrl}/${log.issueId}" 
+               target="_blank" 
+               class="issue-link" 
+               onclick="event.stopPropagation();">#${log.issueId}</a>
+            <span class="log-comment">${safeComment}</span>
+        </div>
+      </div>`);
+        }
+      }
+
+      htmlBuffer.push(
+        `</div><button class="btn-quick-add" onclick="openLogModal('${dateStr}', ${dayData?.totalHours || 0})">+</button>`,
+      );
+
+      dayCell.innerHTML = htmlBuffer.join("");
+      fragment.appendChild(dayCell);
     }
 
+    grid.appendChild(fragment);
     syncSelectors();
   } catch (err) {
     console.error("Calendar Load Error:", err);
     grid.innerHTML = `<div class="empty-state">Unable to load calendar.</div>`;
+  }
+}
+
+function updateProgressStats(statusData, year, month) {
+  let totalLogged = 0;
+  Object.values(statusData).forEach((day) => {
+    totalLogged += Number(day.totalHours || 0);
+  });
+
+  const maxHours = calculateMaxWorkingHours(year, month);
+  const percentage = Math.min((totalLogged / maxHours) * 100, 100);
+
+  const progressText = document.getElementById("monthTotalProgress");
+  const progressBar = document.getElementById("monthProgressBar");
+
+  if (progressText && progressBar) {
+    progressText.innerText = `${totalLogged.toFixed(1)} / ${maxHours}h`;
+    progressBar.style.width = `${percentage}%`;
+    progressBar.style.backgroundColor =
+      percentage >= 100 ? "#27ae60" : percentage > 50 ? "#2ecc71" : "#f1c40f";
   }
 }
 

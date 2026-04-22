@@ -8,6 +8,9 @@
   --white: #ffffff;
 }
 
+/* =========================================
+   1. BASE & LAYOUT
+========================================= */
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background: var(--bg);
@@ -21,14 +24,12 @@ body {
   margin: auto;
 }
 
-/* Layout Grid chính */
 .dashboard-grid {
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 25px;
 }
 
-/* Card Style */
 .card {
   background: var(--white);
   padding: 20px;
@@ -43,200 +44,6 @@ h3 {
   padding-bottom: 12px;
   color: var(--primary);
   font-size: 1.2rem;
-}
-
-/* Form elements */
-label {
-  display: block;
-  margin-top: 15px;
-  font-weight: 600;
-  font-size: 0.9rem;
-}
-
-input,
-select {
-  width: 100%;
-  padding: 12px;
-  margin: 8px 0;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-sizing: border-box;
-  transition: border 0.3s;
-}
-
-input:focus {
-  border-color: var(--primary);
-  outline: none;
-}
-
-button {
-  cursor: pointer;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 6px;
-  font-weight: bold;
-  transition: opacity 0.2s;
-}
-
-button:hover {
-  opacity: 0.9;
-}
-
-.btn-save {
-  background: var(--primary);
-  color: white;
-  width: 100%;
-  margin-top: 10px;
-}
-.btn-save:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-cancel {
-  margin-top: 10px;
-}
-
-.btn-confirm {
-  background: var(--success);
-  color: white;
-  font-size: 0.85rem;
-}
-
-/* Project Select List */
-.project-list {
-  max-height: 250px;
-  overflow-y: auto;
-  border: 1px solid #eee;
-  padding: 12px;
-  background: #fafafa;
-  border-radius: 6px;
-}
-
-/* Project Tree Styling */
-.project-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid #f9f9f9;
-}
-
-.project-item.child {
-  margin-left: 25px; /* Indent for children */
-  border-left: 2px solid #eee;
-  padding-left: 10px;
-}
-
-.project-item span {
-  font-size: 0.9rem;
-}
-
-.parent-label {
-  font-weight: bold;
-  color: var(--primary);
-}
-
-.child-label {
-  color: #555;
-}
-
-.project-item:last-child {
-  border-bottom: none;
-}
-.project-item input[type="checkbox"] {
-  width: auto;
-  margin: 0;
-}
-
-/* Pending Queue Table */
-.table-wrapper {
-  overflow-x: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 10px;
-}
-th {
-  background: #f8f9fa;
-  font-size: 0.9rem;
-  color: #666;
-}
-th,
-td {
-  text-align: left;
-  padding: 15px;
-  border-bottom: 1px solid #eee;
-}
-
-.editable-input {
-  border: 1px dashed var(--warning) !important;
-  background: #fffdf0;
-  margin: 0 !important;
-}
-
-/* Calendar Grid */
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 8px;
-}
-
-.day-header {
-  font-weight: bold;
-  padding: 10px;
-  background: var(--primary);
-  color: white;
-  border-radius: 4px;
-  text-align: center;
-}
-
-.day-cell {
-  min-height: 100px;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--white);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.day-cell.weekend {
-  background: #f1f1f1;
-  color: #999;
-  border-style: dashed;
-}
-
-.day-number {
-  font-weight: bold;
-  font-size: 1.1rem;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-right: 5px;
-}
-
-.low-time {
-  background: var(--danger);
-}
-.full-time {
-  background: var(--success);
-}
-
-.time-label {
-  font-size: 0.85rem;
-  font-weight: bold;
-  background: #f8f9fa;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
 }
 
 /* Core Layout Improvements */
@@ -265,6 +72,102 @@ td {
   letter-spacing: -0.5px;
 }
 
+.flex-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px !important;
+}
+
+.card-header h3 {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* =========================================
+   2. FORMS & BUTTONS
+========================================= */
+label {
+  display: block;
+  margin-top: 15px;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  transition: border 0.3s;
+}
+
+input:focus,
+select:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
+select:disabled {
+  background-color: #edf2f7;
+  cursor: not-allowed;
+  color: #a0aec0;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  transition: opacity 0.2s;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+.btn-save {
+  background: var(--primary);
+  color: white;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  margin-top: 10px;
+}
+
+.btn-confirm,
+.btn-scan {
+  background: var(--success);
+  color: white;
+}
+
+.btn-confirm {
+  font-size: 0.85rem;
+}
+
+.btn-scan:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.btn-action {
+  font-size: 0.85rem;
+  padding: 8px 16px;
+  transition: all 0.2s ease;
+}
+
 .btn-home {
   display: flex;
   align-items: center;
@@ -287,15 +190,26 @@ td {
   transform: translateY(-1px);
 }
 
-.btn-home svg {
-  transition: transform 0.2s ease;
-}
-
 .btn-home:hover svg {
   transform: scale(1.1);
 }
 
-/* User Display Badge */
+.btn-icon {
+  background: #edf2f7;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #4a5568;
+}
+
+.btn-icon:hover {
+  background: #e2e8f0;
+}
+
+/* =========================================
+   3. COMPONENTS (Badges, Lists, Tables)
+========================================= */
 .user-info-badge {
   display: flex;
   align-items: center;
@@ -313,43 +227,20 @@ td {
   display: inline-block;
   width: 8px;
   height: 8px;
-  background: #28a745; /* Trạng thái online */
+  background: #28a745;
   border-radius: 50%;
   margin-right: 10px;
 }
 
-/* Card Header with Buttons */
-.flex-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px !important;
+.author-badge {
+  background: #e1f5fe;
+  color: #0288d1;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
-.card-header h3 {
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-/* Buttons */
-.btn-action {
-  font-size: 0.85rem;
-  padding: 8px 16px;
-  transition: all 0.2s ease;
-}
-
-.btn-scan {
-  background: var(--success);
-  color: white;
-}
-
-.btn-scan:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-
-/* Template Hint */
 .template-hint {
   background: #f8f9fa;
   padding: 8px;
@@ -360,7 +251,94 @@ td {
   border: 1px solid #eee;
 }
 
-/* Empty States & Table */
+/* Project List */
+.project-list {
+  max-height: 250px;
+  overflow-y: auto;
+  border: 1px solid #eaeaea;
+  padding: 12px;
+  background: #fdfdfd;
+  border-radius: 6px;
+}
+
+.project-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f9f9f9;
+}
+
+.project-item.child {
+  margin-left: 25px;
+  border-left: 2px solid #eee;
+  padding-left: 10px;
+}
+
+.project-item:last-child {
+  border-bottom: none;
+}
+
+.project-item span {
+  font-size: 0.9rem;
+}
+.parent-label {
+  font-weight: bold;
+  color: var(--primary);
+}
+.child-label {
+  color: #555;
+}
+.project-item input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+
+/* Tables */
+.table-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #eee;
+  border-radius: 4px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+table thead th {
+  background: #f8f9fa;
+  color: #666;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 12px 15px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: inset 0 -1px 0 #eee;
+}
+
+table tbody tr:hover {
+  background-color: #fcfcfc;
+}
+
+.editable-input {
+  border: 1px dashed var(--warning) !important;
+  background: #fffdf0;
+  margin: 0 !important;
+}
+
 .empty-table,
 .empty-state {
   text-align: center;
@@ -369,88 +347,24 @@ td {
   font-style: italic;
 }
 
-.project-list {
-  background: #fdfdfd;
-  border: 1px solid #eaeaea;
-}
-
-/* Enhanced Table */
-table thead th {
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.5px;
-  padding: 12px 15px;
-}
-
-table tbody tr:hover {
-  background-color: #fcfcfc;
-}
-
-/* Calendar Refinement */
-.calendar-wrapper {
-  background: #fcfcfc;
-  padding: 10px;
-  border-radius: 8px;
-}
-
-.day-cell {
-  transition: transform 0.1s ease;
-  cursor: pointer;
-}
-
-.day-cell:hover:not(.weekend) {
-  border-color: var(--primary);
-  background: #fff;
-}
-
-.day-num {
-  font-size: 0.9rem;
-  color: #888;
-}
-
-/* Cố định chiều cao vùng chứa bảng */
-.table-wrapper {
-  max-height: 400px; /* Bạn có thể điều chỉnh con số này */
-  overflow-y: auto;
-  border: 1px solid #eee;
-  border-radius: 4px;
-}
-
-/* Giữ header đứng yên khi scroll (Sticky Header) */
-table thead th {
-  position: sticky;
-  top: 0;
-  background: #f8f9fa;
-  z-index: 10;
-  box-shadow: inset 0 -1px 0 #eee;
-}
-
-/* Style cho badge tên Author cho đẹp */
-.author-badge {
-  background: #e1f5fe;
-  color: #0288d1;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
-}
-
-/* Calendar Container */
-.calendar-controls {
-  display: flex;
-  align-items: center; /* Căn giữa theo chiều dọc */
-  justify-content: flex-start; /* Đẩy sát sang trái */
-  gap: 8px; /* Khoảng cách giữa nút và chữ */
-  background: #f1f3f4; /* Màu nền nhẹ cho cụm điều hướng (tùy chọn) */
-  padding: 4px;
-  border-radius: 8px;
-}
-
+/* =========================================
+   4. CALENDAR UI
+========================================= */
 .calendar-card {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   border: none;
+}
+
+.calendar-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  background: #f1f3f4;
+  padding: 4px;
+  border-radius: 8px;
 }
 
 .calendar-nav {
@@ -469,7 +383,6 @@ table thead th {
   white-space: nowrap;
 }
 
-/* Header thứ trong tuần */
 .calendar-weekday-header {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -487,22 +400,27 @@ table thead th {
   letter-spacing: 0.05em;
 }
 
-/* Grid ngày */
 .calendar-days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: #edf2f7; /* Màu đường kẻ */
-  gap: 1px; /* Tạo line giữa các ô */
+  gap: 5px;
+  background: #fcfcfc;
+  padding: 10px;
+  border-radius: 8px;
 }
 
 .day-cell {
-  background: #ffffff;
-  min-height: 110px;
-  padding: 10px;
+  min-height: 120px;
   display: flex;
   flex-direction: column;
-  transition: all 0.2s ease;
   position: relative;
+  border: 1px solid #edf2f7;
+  padding: 4px;
+  background: #fff;
+  transition:
+    transform 0.1s ease,
+    background 0.2s,
+    box-shadow 0.2s;
 }
 
 .day-cell:hover {
@@ -511,16 +429,155 @@ table thead th {
   box-shadow: inset 0 0 0 2px #4299e1;
 }
 
+.clickable-slot:hover {
+  background-color: #ebf8ff !important;
+  cursor: pointer;
+  border-color: #4299e1;
+}
+
+.day-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
 .day-number {
   font-weight: 600;
   color: #4a5568;
   font-size: 0.9rem;
-  margin-bottom: 8px;
 }
 
-/* Trạng thái Log Time */
+/* Log Tasks in Calendar */
+.log-list-container {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 85px;
+  padding-right: 2px;
+}
+
+.log-list-container::-webkit-scrollbar {
+  width: 3px;
+}
+.log-list-container::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 10px;
+}
+
+.log-item-project {
+  font-size: 9px;
+  font-weight: bold;
+  color: #4a5568;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 1px;
+  opacity: 0.8;
+}
+
+.log-item {
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: #f8fafc;
+  border-left: 3px solid #3182ce;
+  margin-bottom: 4px;
+  border-radius: 2px;
+  font-size: 11px;
+}
+
+.log-row-main {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.log-project {
+  font-weight: 700;
+  color: #2d3748;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 70%;
+}
+
+.log-hours {
+  color: #3182ce;
+}
+
+.log-row-sub {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.log-comment {
+  color: #718096;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.issue-link {
+  font-weight: bold;
+  color: #4a5568;
+  text-decoration: none;
+}
+.issue-link:hover {
+  text-decoration: underline;
+}
+
+.log-item:hover {
+  background: #e2e8f0;
+  cursor: help;
+}
+
+.log-item:hover::after {
+  content: attr(data-comment);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #2d3748;
+  color: #fff;
+  padding: 5px 10px;
+  border-radius: 4px;
+  width: max-content;
+  max-width: 250px;
+  z-index: 10;
+  white-space: normal;
+  pointer-events: none;
+}
+
+.log-item[data-comment=""]:hover::after,
+.log-item:not([data-comment]):hover::after {
+  display: none;
+}
+
+.btn-quick-add {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: #3182ce;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-cell:hover .btn-quick-add {
+  display: flex;
+}
+
+/* Calendar Status Colors */
 .status-full {
-  background-color: #f0fff4; /* Xanh lá cực nhẹ */
+  background-color: #f0fff4;
 }
 .status-full .hours-badge {
   background: #48bb78;
@@ -528,7 +585,7 @@ table thead th {
 }
 
 .status-incomplete {
-  background-color: #fff5f5; /* Đỏ cực nhẹ */
+  background-color: #fff5f5;
 }
 .status-incomplete .hours-badge {
   background: #f56565;
@@ -536,41 +593,14 @@ table thead th {
 }
 
 .hours-badge {
-  margin-top: auto;
-  font-size: 0.75rem;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-weight: 700;
-  width: fit-content;
-  align-self: flex-end;
-}
-
-/* Navigation Buttons */
-.btn-icon {
   background: #edf2f7;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  color: #4a5568;
+  padding: 1px 4px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: bold;
 }
 
-.btn-icon:hover {
-  background: #e2e8f0;
-}
-
-select {
-  padding: 6px 10px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  margin-left: 5px;
-}
-select:disabled {
-  background-color: #edf2f7;
-  cursor: not-allowed;
-  color: #a0aec0;
-}
-
+/* Month Stats */
 .month-stats {
   flex: 1;
   margin: 0 30px;
@@ -605,20 +635,14 @@ select:disabled {
 
 .progress-fill {
   height: 100%;
-  width: 0%; /* Sẽ update bằng JS */
+  width: 0%;
   background-color: #4299e1;
   transition:
     width 0.5s ease-out,
     background-color 0.3s;
 }
 
-/* Responsive một chút */
-@media (max-width: 900px) {
-  .month-stats {
-    display: none;
-  }
-}
-
+/* Selectors UI in Header */
 .current-date-selector {
   display: flex;
   align-items: center;
@@ -644,12 +668,22 @@ select:disabled {
   cursor: pointer;
   border-radius: 6px;
   margin-right: 5px;
+  width: auto; /* Tránh bị kéo full width như select thông thường */
 }
 
 .styled-select:hover {
   border-color: #cbd5e0;
 }
 
+@media (max-width: 900px) {
+  .month-stats {
+    display: none;
+  }
+}
+
+/* =========================================
+   5. MODAL
+========================================= */
 .modal {
   display: none;
   position: fixed;
@@ -660,8 +694,8 @@ select:disabled {
   height: 100%;
   background-color: rgba(0, 0, 0, 0.5);
   overflow-y: auto;
-  flex: 1;
 }
+
 .modal-content {
   background: white;
   margin: 10% auto;
@@ -670,6 +704,7 @@ select:disabled {
   border-radius: 12px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -677,49 +712,37 @@ select:disabled {
   border-bottom: 1px solid #eee;
   padding-bottom: 10px;
 }
+
 .close-modal {
   cursor: pointer;
   font-size: 24px;
   color: #aaa;
 }
+
 .task-selector-group {
   display: flex;
   gap: 8px;
 }
+
 .btn-small-plus {
   background: #4299e1;
   color: white;
   width: 42px;
   border-radius: 6px;
   font-size: 1.2rem;
+  padding: 0;
 }
 
+/* Modal Select Options Styling */
 #modalTaskSelect {
-  font-family: "Cascadia Code", "Courier New", monospace;
+  font-family: "Consolas", "Monaco", "Cascadia Code", "Courier New", monospace;
   font-size: 13px;
   color: #2d3748;
+  line-height: 1.5;
 }
 
 #modalTaskSelect option {
   background-color: #fff;
-  padding: 5px;
-}
-
-/* Thêm màu sắc nhẹ cho các ô clickable */
-.clickable-slot:hover {
-  background-color: #ebf8ff !important;
-  cursor: pointer;
-  border: 1px solid #4299e1;
-}
-
-#modalTaskSelect {
-  font-family: "Consolas", "Monaco", "Courier New", monospace;
-  line-height: 1.5;
-}
-
-/* Chrome/Safari không hỗ trợ style cho option nhiều, 
-   nhưng thụt lề bằng Space ( ) vẫn hoạt động rất tốt */
-#modalTaskSelect option {
-  padding: 8px 0;
+  padding: 8px 5px;
   border-bottom: 1px solid #edf2f7;
 }
