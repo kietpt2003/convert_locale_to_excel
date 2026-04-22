@@ -349,6 +349,7 @@ document.getElementById("btnConfirmCreate").onclick = async () => {
   const statusId = document.getElementById("modalStatusSelect").value;
   const epicTypeValue = document.getElementById("modalEpicTypeSelect").value;
   const projectId = document.getElementById("modalProjectSelect").value;
+  const selectedTaskId = document.getElementById("modalTaskSelect").value;
 
   if (!subject) {
     alert("Please input task title!");
@@ -373,7 +374,7 @@ document.getElementById("btnConfirmCreate").onclick = async () => {
     assigned_to_id: "me",
     custom_fields: [
       {
-        id: epicTypeId,
+        id: EPIC_TYPE_ID,
         value: epicTypeValue,
       },
     ],
