@@ -38,6 +38,11 @@ export function initAuth() {
       }
       // Clear URL path
       window.history.replaceState({}, document.title, window.location.pathname);
+
+      window.history.pushState(null, null, window.location.href);
+      window.onpopstate = function (event) {
+        window.history.forward();
+      };
     }
   } else if (urlToken) {
     // Save JWT token
