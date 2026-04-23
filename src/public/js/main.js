@@ -25,15 +25,20 @@ export function initAuth() {
   const hashParams = new URLSearchParams(window.location.hash.substring(1));
   const urlToken = hashParams.get("token");
   const urlError = hashParams.get("error");
+  const existingToken = localStorage.getItem("app_token");
 
   if (urlError) {
-    if (urlError === "access_denied") {
-      alert("Access Denied. Please contact Admin for IT Support");
+    if (existingToken) {
+      window.history.replaceState({}, document.title, window.location.pathname);
     } else {
-      alert("Login Failed: " + urlError);
+      if (urlError === "access_denied") {
+        alert("Access Denied. Please contact Admin for IT Support");
+      } else {
+        alert("Login Failed: " + urlError);
+      }
+      // Clear URL path
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-    // Clear URL path
-    window.history.replaceState({}, document.title, window.location.pathname);
   } else if (urlToken) {
     // Save JWT token
     localStorage.setItem("app_token", urlToken);
@@ -51,6 +56,11 @@ export function initAuth() {
     updateUserInfoUI(); //Update user info to UI
 
     init();
+
+    window.history.pushState(null, null, window.location.href);
+    window.onpopstate = function (event) {
+      window.history.forward();
+    };
   } else {
     google.accounts.id.initialize({
       client_id:

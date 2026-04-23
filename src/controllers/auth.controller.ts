@@ -5,13 +5,22 @@ import jwt from "jsonwebtoken";
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
 
 export const handleSignIn = async (req: Request, res: Response) => {
+  const redirectWithoutHistory = (url: string) => {
+    return res.send(`
+      <html>
+        <body>
+          <script>
+            window.location.replace("${url}");
+          </script>
+        </body>
+      </html>
+    `);
+  };
   try {
-    // Khi chạy ux_mode: "redirect", Google sẽ gửi token trong field tên là "credential"
-    // Ta vẫn giữ `req.body.token` để tương thích ngược nếu có hàm nào gọi kiểu cũ
     const googleIdToken = req.body.credential || req.body.token;
 
     if (!googleIdToken) {
-      return res.redirect('/#error=missing_token');
+      return redirectWithoutHistory('/#error=missing_token');
     }
 
     const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -22,7 +31,9 @@ export const handleSignIn = async (req: Request, res: Response) => {
     });
 
     const payload = ticket.getPayload();
-    if (!payload) return res.redirect('/#error=invalid_token');
+    if (!payload) {
+      return redirectWithoutHistory('/#error=invalid_token')
+    }
 
     const email = payload.email;
 
@@ -32,8 +43,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
       if (email === process.env.ADMIN_EMAIL) {
         authUser = await AuthorizedUser.create({ email, role: "admin" });
       } else {
-        // Redirect về Frontend kèm mã lỗi
-        return res.redirect('/#error=access_denied');
+        return redirectWithoutHistory('/#error=access_denied');
       }
     }
 
@@ -49,12 +59,9 @@ export const handleSignIn = async (req: Request, res: Response) => {
       { expiresIn: "1d" }
     );
 
-    // QUAN TRỌNG: Dùng res.redirect để đá người dùng về lại trang web
-    // Gắn customToken vào dạng Hash (#) trên URL để bảo mật hơn param (?)
-    res.redirect(`/#token=${customToken}`);
-
+    return redirectWithoutHistory(`/#token=${customToken}`);
   } catch (error) {
     console.error("Auth error:", error);
-    res.redirect('/#error=auth_failed');
+    return redirectWithoutHistory('/#error=auth_failed');
   }
 };
