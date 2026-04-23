@@ -52,15 +52,14 @@ export function initAuth() {
 
     init();
   } else {
-    console.log("check", window.location.origin + "/api/auth/google");
-    // google.accounts.id.initialize({
-    //   client_id:
-    //     "797919519685-raio24mb9u572jjc26o7mj7bsg8m4vrc.apps.googleusercontent.com",
-    //   // Redirect to signin Google
-    //   ux_mode: "redirect",
-    //   // Endpoint Backend for google redirect
-    //   login_uri: window.location.origin + "/api/auth/google",
-    // });
+    google.accounts.id.initialize({
+      client_id:
+        "797919519685-raio24mb9u572jjc26o7mj7bsg8m4vrc.apps.googleusercontent.com",
+      // Redirect to signin Google
+      ux_mode: "redirect",
+      // Endpoint Backend for google redirect
+      login_uri: window.location.origin + "/api/auth/google",
+    });
 
     google.accounts.id.renderButton(
       document.getElementById("googleButtonDiv"),
