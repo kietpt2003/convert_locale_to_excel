@@ -9,6 +9,24 @@ import { initModalEvents } from "./modalLogTime.js";
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
 
+// Use this function to navigate and remove token in admin-redmine
+async function fetchWithAuth(url, options = {}) {
+  const currentToken = localStorage.getItem("app_token");
+  const headers = {
+    ...options.headers,
+    Authorization: `Bearer ${currentToken}`,
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401 || response.status === 403) {
+    localStorage.removeItem("app_token");
+    window.location.replace("/index.html");
+  }
+
+  return response;
+}
+
 /**
  * Initialize application events
  */
@@ -36,7 +54,7 @@ export async function initApp() {
 // 1. Load configuration from MongoDB
 export async function loadUserData() {
   try {
-    const res = await fetch(`/api/redmine/user/me`, {
+    const res = await fetchWithAuth(`/api/redmine/user/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const user = await res.json();
@@ -74,7 +92,7 @@ export async function saveRedmineConfig() {
   const watchedProjectIds = Array.from(checkedBoxes).map((cb) => cb.value);
 
   try {
-    const res = await fetch(`/api/redmine/user/redmine-config`, {
+    const res = await fetchWithAuth(`/api/redmine/user/redmine-config`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -104,7 +122,7 @@ export async function fetchRedmineProjects(selectedIds = []) {
   listEl.innerHTML = "Loading projects...";
 
   try {
-    const res = await fetch(`/api/redmine/projects`, {
+    const res = await fetchWithAuth(`/api/redmine/projects`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -201,7 +219,7 @@ export async function scanForTasks() {
     "<tr><td colspan='6' class='empty-table'>Scanning Redmine...</td></tr>";
 
   try {
-    const res = await fetch(`/api/redmine/scan-parents`, {
+    const res = await fetchWithAuth(`/api/redmine/scan-parents`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -251,7 +269,7 @@ export async function scanForTasks() {
 
 async function fetchTrackers() {
   try {
-    const res = await fetch("/api/redmine/trackers", {
+    const res = await fetchWithAuth("/api/redmine/trackers", {
       headers: { Authorization: `Bearer ${token}` },
     });
     TRACKERS_CACHE = await res.json();
@@ -269,7 +287,7 @@ window.confirmCreateSubtask = async function (parentId, projectId) {
   const subject = document.getElementById(`subject-${parentId}`).value;
 
   try {
-    const res = await fetch(`/api/redmine/create-subtask`, {
+    const res = await fetchWithAuth(`/api/redmine/create-subtask`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

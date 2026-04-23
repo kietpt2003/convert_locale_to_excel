@@ -25,25 +25,18 @@ export function initAuth() {
   const hashParams = new URLSearchParams(window.location.hash.substring(1));
   const urlToken = hashParams.get("token");
   const urlError = hashParams.get("error");
-  const existingToken = localStorage.getItem("app_token");
+  // const existingToken = localStorage.getItem("app_token");
 
   if (urlError) {
-    if (existingToken) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else {
-      if (urlError === "access_denied") {
-        alert("Access Denied. Please contact Admin for IT Support");
-      } else {
-        alert("Login Failed: " + urlError);
-      }
-      // Clear URL path
-      window.history.replaceState({}, document.title, window.location.pathname);
+    localStorage.removeItem("app_token");
 
-      window.history.pushState(null, null, window.location.href);
-      window.onpopstate = function (event) {
-        window.history.forward();
-      };
+    if (urlError === "access_denied") {
+      alert("Access Denied. Please contact Admin for IT Support");
+    } else {
+      alert("Login Failed: " + urlError);
     }
+    // Clear URL path
+    window.history.replaceState({}, document.title, window.location.pathname);
   } else if (urlToken) {
     // Save JWT token
     localStorage.setItem("app_token", urlToken);
@@ -61,11 +54,6 @@ export function initAuth() {
     updateUserInfoUI(); //Update user info to UI
 
     init();
-
-    window.history.pushState(null, null, window.location.href);
-    window.onpopstate = function (event) {
-      window.history.forward();
-    };
   } else {
     google.accounts.id.initialize({
       client_id:
@@ -80,33 +68,6 @@ export function initAuth() {
       document.getElementById("googleButtonDiv"),
       { theme: "outline", size: "large" },
     );
-  }
-}
-
-async function handleGoogleLogin(response) {
-  try {
-    const res = await fetch("/auth/google", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: response.credential }),
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      authToken = data.token;
-      localStorage.setItem("app_token", authToken);
-
-      document.getElementById("login-screen").style.display = "none";
-      document.getElementById("main-app").style.display = "block";
-
-      updateUserInfoUI();
-
-      init();
-    } else {
-      alert("Login failed!");
-    }
-  } catch (error) {
-    console.error(error);
   }
 }
 
