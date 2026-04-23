@@ -32,6 +32,8 @@ import adminRoutes from './routes/admin.routes.js';
 import languageRoutes from './routes/languages.routes.js';
 import agentRoutes from './routes/agent.routes.js';
 import redmineRoutes from './routes/redmine.routes.js';
+import authRoutes from './routes/auth.routes.js';
+
 
 const app = express();
 const PORT = 3000;
@@ -1108,6 +1110,7 @@ app.post("/translate-js", verifyToken, async (req: Request, res: Response) => {
 });
 
 app.use('/admin', adminRoutes)
+app.use('/api/auth', authRoutes)
 app.use('/api/languages', languageRoutes)
 app.use('/api/agent', agentRoutes);
 app.use('/api/redmine', redmineRoutes);

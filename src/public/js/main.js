@@ -3,9 +3,10 @@ import { initChatAgent } from "./chat-agent.js";
 let authToken = localStorage.getItem("app_token");
 
 async function fetchWithAuth(url, options = {}) {
+  const currentToken = localStorage.getItem("app_token");
   const headers = {
     ...options.headers,
-    Authorization: `Bearer ${authToken}`,
+    Authorization: `Bearer ${currentToken}`,
   };
 
   const response = await fetch(url, { ...options, headers });
@@ -20,6 +21,29 @@ async function fetchWithAuth(url, options = {}) {
 
 // ================= AUTHENTICATION =================
 export function initAuth() {
+  // --- Get TOKEN receive from BACKEND redirect ---
+  const hashParams = new URLSearchParams(window.location.hash.substring(1));
+  const urlToken = hashParams.get("token");
+  const urlError = hashParams.get("error");
+
+  if (urlError) {
+    if (urlError === "access_denied") {
+      alert("Access Denied. Please contact Admin for IT Support");
+    } else {
+      alert("Login Failed: " + urlError);
+    }
+    // Clear URL path
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (urlToken) {
+    // Save JWT token
+    localStorage.setItem("app_token", urlToken);
+    // Clear URL path
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
+  // --- Check already signin ---
+  authToken = localStorage.getItem("app_token");
+
   if (authToken) {
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("main-app").style.display = "block";
@@ -28,11 +52,16 @@ export function initAuth() {
 
     init();
   } else {
+    console.log("check", window.location.origin + "/api/auth/google");
     google.accounts.id.initialize({
       client_id:
         "797919519685-raio24mb9u572jjc26o7mj7bsg8m4vrc.apps.googleusercontent.com",
-      callback: handleGoogleLogin,
+      // Redirect to signin Google
+      ux_mode: "redirect",
+      // Endpoint Backend for google redirect
+      login_uri: window.location.origin + "/api/auth/google",
     });
+
     google.accounts.id.renderButton(
       document.getElementById("googleButtonDiv"),
       { theme: "outline", size: "large" },
