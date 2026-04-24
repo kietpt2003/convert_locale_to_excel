@@ -5,12 +5,17 @@ import {
   initQuickSelectors,
 } from "./calendar.js";
 import { initModalEvents } from "./modalLogTime.js";
+import { debounce } from "./debounce.js";
+import {
+  initQuickModalEvents,
+  openQuickLogTime,
+} from "./projectRedmineExplorer.js";
 
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
 
 // Use this function to navigate and remove token in admin-redmine
-async function fetchWithAuth(url, options = {}) {
+export async function fetchWithAuth(url, options = {}) {
   const currentToken = localStorage.getItem("app_token");
   const headers = {
     ...options.headers,
@@ -42,6 +47,7 @@ export async function initApp() {
 
   initQuickSelectors();
   initModalEvents();
+  initQuickModalEvents();
 
   document.getElementById("prevMonth").onclick = () => changeMonth(-1);
   document.getElementById("nextMonth").onclick = () => changeMonth(1);
@@ -306,3 +312,195 @@ window.confirmCreateSubtask = async function (parentId, projectId) {
     alert("Network error");
   }
 };
+
+// 1. Hàm chuyển đổi Tab
+window.openTab = function (evt, tabName) {
+  // 1. Lấy tất cả các tab content và loại bỏ class 'active'
+  const tabContents = document.querySelectorAll(".tab-content");
+  tabContents.forEach((content) => {
+    content.classList.remove("active");
+  });
+
+  // 2. Lấy tất cả các nút tab và loại bỏ class 'active'
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  tabBtns.forEach((btn) => {
+    btn.classList.remove("active");
+  });
+
+  // 3. Thêm class 'active' vào tab hiện tại và nút vừa bấm
+  const selectedTab = document.getElementById(tabName);
+  if (selectedTab) {
+    selectedTab.classList.add("active");
+  }
+
+  if (evt && evt.currentTarget) {
+    evt.currentTarget.classList.add("active");
+  }
+
+  // 4. Nếu là tab Explorer thì load dữ liệu
+  if (tabName === "explorer-tab") {
+    loadFullProjectTree();
+  }
+};
+
+// Hàm bổ trợ để highlight từ khóa
+function highlightText(text, query) {
+  if (!query || !query.trim()) return text;
+
+  // Escape các ký tự đặc biệt trong regex và tạo pattern (không phân biệt hoa thường)
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`(${escapedQuery})`, "gi");
+
+  return text.replace(regex, '<mark class="highlight-text">$1</mark>');
+}
+
+function renderProjectNodes(projects, parentElement, pQuery, tQuery) {
+  projects.forEach((proj) => {
+    const li = document.createElement("li");
+    const hasChildren =
+      (proj.subProjects && proj.subProjects.length > 0) ||
+      (proj.tasks && proj.tasks.length > 0);
+
+    li.className = `tree-item project-node ${hasChildren ? "" : "no-children"}`;
+
+    // Highlight ID và Name
+    const highlightedProjectId = highlightText(proj.id.toString(), pQuery);
+    const highlightedName = highlightText(proj.name, pQuery);
+
+    // Lấy URL từ input hoặc config (giả sử có element id='redmineUrl')
+    const redmineBaseUrl = document.getElementById("redmineUrl").value;
+    const projectLink = `${redmineBaseUrl}/projects/${proj?.identifier || ""}`;
+
+    li.innerHTML = `
+      <div class="tree-row">
+        <span class="toggle-icon">▶</span>
+        <span class="icon">📁</span>
+        <span class="label project-name">
+          [<a href="${projectLink}" target="_blank" class="project-id-link" onclick="event.stopPropagation()">#${highlightedProjectId}</a>] 
+          ${highlightedName}
+        </span>
+        <span class="badge">${proj.tasks ? proj.tasks.length : 0} tasks</span>
+      </div>
+      <ul class="sub-tree"></ul>
+    `;
+
+    const subTreeUl = li.querySelector(".sub-tree");
+    const treeRow = li.querySelector(".tree-row");
+
+    // Sự kiện đóng mở (Click vào tree-row nhưng trừ cái link ra nhờ stopPropagation ở trên)
+    treeRow.addEventListener("click", (e) => {
+      e.stopPropagation();
+      li.classList.toggle("open");
+    });
+
+    if (proj.subProjects && proj.subProjects.length > 0) {
+      renderProjectNodes(proj.subProjects, subTreeUl, pQuery, tQuery);
+    }
+    if (proj.tasks && proj.tasks.length > 0) {
+      renderTaskNodes(proj.tasks, subTreeUl, tQuery);
+    }
+
+    parentElement.appendChild(li);
+  });
+}
+
+function renderTaskNodes(tasks, parentElement, tQuery) {
+  tasks.forEach((task) => {
+    const li = document.createElement("li");
+    const hasChildren = task.subtasks && task.subtasks.length > 0;
+
+    li.className = `tree-item task-node ${hasChildren ? "" : "no-children"}`;
+    const highlightedSubject = highlightText(task.subject, tQuery);
+    const highlightedTaskId = highlightText(task.id.toString(), tQuery);
+
+    // Lấy URL Redmine từ config để làm link (giả sử bạn lưu trong window.redmineUrl)
+    const redmineUrl = document.getElementById("redmineUrl").value;
+    const taskLink = `${redmineUrl}/issues/${task.id}`;
+
+    li.innerHTML = `
+      <div class="tree-row">
+        <span class="toggle-icon">▶</span>
+        <span class="icon">🔹</span>
+        <a href="${taskLink}" target="_blank" class="task-id-link">#${highlightedTaskId}</a>
+        <span class="spent-hours-badge">${task?.spent_hours || 0}h</span>
+        <span class="label task-subject">${highlightedSubject}</span>
+        <span class="task-status">${task.status.name}</span>
+        <span class="log-time-trigger" title="Quick Log Time">🕒</span>
+      </div>
+      <ul class="sub-tree"></ul>
+    `;
+
+    const treeRow = li.querySelector(".tree-row");
+    const logTimeBtn = li.querySelector(".log-time-trigger");
+
+    // Click vào dòng để đóng/mở
+    treeRow.addEventListener("click", (e) => {
+      e.stopPropagation();
+      li.classList.toggle("open");
+    });
+
+    // Sự kiện mở Modal Log Time nhanh
+    logTimeBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Ngăn việc đóng/mở tree khi click icon
+      openQuickLogTime(task);
+    });
+
+    if (hasChildren) {
+      renderTaskNodes(task.subtasks, li.querySelector(".sub-tree"), tQuery);
+    }
+    parentElement.appendChild(li);
+  });
+}
+
+// Cập nhật hàm loadFullProjectTree để truyền query vào
+async function loadFullProjectTree() {
+  const pName = document.getElementById("treeSearchProject").value;
+  const tName = document.getElementById("treeSearchTask").value;
+
+  const container = document.getElementById("projectTreeContainer");
+  // Không nên clear toàn bộ innerHTML liên tục khi gõ để tránh giật lag,
+  // nhưng ở đây ta làm đơn giản để đảm bảo highlight mới nhất.
+  container.style.opacity = "0.5";
+
+  try {
+    const response = await fetchWithAuth(
+      `/api/redmine/projects/tasks?projectName=${pName}&taskName=${tName}`,
+    );
+    const data = await response.json();
+
+    container.innerHTML = "";
+    container.style.opacity = "1";
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div class="empty-state">No data found</div>';
+      return;
+    }
+
+    const rootList = document.createElement("ul");
+    rootList.className = "tree-root";
+
+    // Truyền thêm pName và tName xuống để highlight
+    renderProjectNodes(data, rootList, pName, tName);
+
+    if (pName || tName) {
+      const allItems = rootList.querySelectorAll(".tree-item");
+      allItems.forEach((item) => item.classList.add("open"));
+    }
+
+    container.appendChild(rootList);
+  } catch (error) {
+    container.innerHTML = '<div class="error-state">Error loading data</div>';
+  }
+}
+
+const debouncedLoadTree = debounce(() => {
+  loadFullProjectTree();
+}, 1000);
+
+// Lắng nghe sự kiện search
+document
+  .getElementById("treeSearchProject")
+  .addEventListener("input", debouncedLoadTree);
+document
+  .getElementById("treeSearchTask")
+  .addEventListener("input", debouncedLoadTree);

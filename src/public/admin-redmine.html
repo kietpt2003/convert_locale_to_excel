@@ -78,91 +78,137 @@
         </aside>
 
         <main>
-          <div class="card">
-            <div class="card-header flex-header">
-              <h3>⏳ Sub-task Approval</h3>
-              <button class="btn-action btn-scan" onclick="scanForTasks()">
-                🔍 Scan New Tasks
-              </button>
-            </div>
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th width="15%">Project</th>
-                    <th width="15%">Author</th>
-                    <th width="25%">Parent Task</th>
-                    <th width="12%">Tracker</th>
-                    <th width="35%">Draft Sub-task</th>
-                    <th width="10%">Action</th>
-                  </tr>
-                </thead>
-                <tbody id="pendingQueue">
-                  <tr>
-                    <td colspan="4" class="empty-table">
-                      Click "Scan" to find tasks from your boss.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+          <div class="tab-navigation">
+            <button
+              class="tab-btn active"
+              onclick="openTab(event, 'approval-tab')"
+            >
+              ⏳ Approvals
+            </button>
+            <button class="tab-btn" onclick="openTab(event, 'calendar-tab')">
+              📅 Calendar
+            </button>
+            <button
+              class="tab-btn"
+              onclick="openTab(event, 'explorer-tab')"
+              id="btnRefreshProjectTree"
+            >
+              🌳 Project Explorer
+            </button>
+          </div>
+
+          <div id="approval-tab" class="tab-content active">
+            <div class="card">
+              <div class="card-header flex-header">
+                <h3>⏳ Sub-task Approval</h3>
+                <button class="btn-action btn-scan" onclick="scanForTasks()">
+                  🔍 Scan New Tasks
+                </button>
+              </div>
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th width="15%">Project</th>
+                      <th width="15%">Author</th>
+                      <th width="25%">Parent Task</th>
+                      <th width="12%">Tracker</th>
+                      <th width="35%">Draft Sub-task</th>
+                      <th width="10%">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pendingQueue">
+                    <tr>
+                      <td colspan="4" class="empty-table">
+                        Click "Scan" to find tasks from your boss.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
-          <div class="card calendar-card">
-            <div class="card-header calendar-nav">
-              <div class="nav-left">
-                <div class="calendar-controls">
-                  <button id="prevMonth" class="btn-icon">❮</button>
+          <div id="calendar-tab" class="tab-content">
+            <div class="card calendar-card">
+              <div class="card-header calendar-nav">
+                <div class="nav-left">
+                  <div class="calendar-controls">
+                    <button id="prevMonth" class="btn-icon">❮</button>
 
-                  <div class="current-date-selector" id="datePickerTrigger">
-                    <span id="currentMonthYear" class="month-label"
-                      >April 2026</span
-                    >
-                    <svg
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                    >
-                      <path d="M7 10l5 5 5-5z"></path>
-                    </svg>
+                    <div class="current-date-selector" id="datePickerTrigger">
+                      <span id="currentMonthYear" class="month-label"
+                        >April 2026</span
+                      >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                      >
+                        <path d="M7 10l5 5 5-5z"></path>
+                      </svg>
+                    </div>
+
+                    <button id="nextMonth" class="btn-icon">❯</button>
                   </div>
+                </div>
 
-                  <button id="nextMonth" class="btn-icon">❯</button>
+                <div class="nav-center month-stats">
+                  <div class="stats-info">
+                    <span class="stats-label">Monthly Progress:</span>
+                    <span id="monthTotalProgress" class="stats-value"
+                      >0 / 0h</span
+                    >
+                  </div>
+                  <div class="progress-bar-container">
+                    <div id="monthProgressBar" class="progress-fill"></div>
+                  </div>
+                </div>
+
+                <div class="nav-right">
+                  <div class="quick-selectors">
+                    <select id="selectMonth" class="styled-select"></select>
+                    <select id="selectYear" class="styled-select"></select>
+                  </div>
+                  <button id="btnToday" class="btn-secondary">Today</button>
                 </div>
               </div>
-
-              <div class="nav-center month-stats">
-                <div class="stats-info">
-                  <span class="stats-label">Monthly Progress:</span>
-                  <span id="monthTotalProgress" class="stats-value"
-                    >0 / 0h</span
-                  >
+              <div class="calendar-container">
+                <div class="calendar-weekday-header">
+                  <div>Mon</div>
+                  <div>Tue</div>
+                  <div>Wed</div>
+                  <div>Thu</div>
+                  <div>Fri</div>
+                  <div>Sat</div>
+                  <div>Sun</div>
                 </div>
-                <div class="progress-bar-container">
-                  <div id="monthProgressBar" class="progress-fill"></div>
-                </div>
-              </div>
-
-              <div class="nav-right">
-                <div class="quick-selectors">
-                  <select id="selectMonth" class="styled-select"></select>
-                  <select id="selectYear" class="styled-select"></select>
-                </div>
-                <button id="btnToday" class="btn-secondary">Today</button>
+                <div class="calendar-days-grid" id="calendarGrid"></div>
               </div>
             </div>
-            <div class="calendar-container">
-              <div class="calendar-weekday-header">
-                <div>Mon</div>
-                <div>Tue</div>
-                <div>Wed</div>
-                <div>Thu</div>
-                <div>Fri</div>
-                <div>Sat</div>
-                <div>Sun</div>
+          </div>
+
+          <div id="explorer-tab" class="tab-content">
+            <div class="card">
+              <div class="card-header flex-header">
+                <h3>🌳 Project & Task Hierarchy</h3>
               </div>
-              <div class="calendar-days-grid" id="calendarGrid"></div>
+              <div class="search-bar">
+                <input
+                  type="text"
+                  id="treeSearchProject"
+                  placeholder="Search project..."
+                />
+                <input
+                  type="text"
+                  id="treeSearchTask"
+                  placeholder="Search task..."
+                />
+              </div>
+              <div class="tree-explorer-container" id="projectTreeContainer">
+                <div class="loading-state">Loading hierarchy...</div>
+              </div>
             </div>
           </div>
         </main>
@@ -257,6 +303,40 @@
           ></textarea>
 
           <button id="btnSubmitLog" class="btn-save">Submit Log</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="quickLogTimeModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="quickModalTitle">🚀 Quick Log Time</h3>
+          <span class="close-modal" onclick="closeQuickModal()">&times;</span>
+        </div>
+
+        <div class="modal-body">
+          <p
+            id="quickTaskInfo"
+            style="font-weight: 600; color: #2c3e50; margin: 10px 0"
+          ></p>
+
+          <label>Date</label>
+          <input type="date" id="quickModalDate" />
+
+          <label>Hours</label>
+          <input type="number" id="quickModalHours" step="0.1" value="8" />
+
+          <label>Activity</label>
+          <select id="quickModalActivitySelect"></select>
+
+          <label>Comment</label>
+          <input
+            type="text"
+            id="quickModalDescription"
+            placeholder="What did you do?"
+          />
+
+          <button id="btnSubmitQuickLog" class="btn-save">Submit Log</button>
         </div>
       </div>
     </div>

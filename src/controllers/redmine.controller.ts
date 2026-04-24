@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import axios from 'axios';
 
 import { REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
@@ -478,3 +478,112 @@ export const getRedmineConfig = async (req: any, res: Response) => {
     res.status(500).json({ message: "Failed to save configuration" });
   }
 }
+
+export const getProjectTaskTree = async (req: any, res: Response) => {
+  try {
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user || !user.redmineApiKey || !user.redmineUrl) {
+      return res.status(400).json({ message: "Missing Redmine Configuration" });
+    }
+
+    const { projectName, taskName, taskDate } = req.query;
+
+    // 1. Lấy TẤT CẢ Project (giới hạn 1000 là mức tối đa của Redmine API)
+    const projectsRes = await axios.get(`${user.redmineUrl}/projects.json`, {
+      headers: { 'X-Redmine-API-Key': user.redmineApiKey },
+      params: { status: REDMINE_PROJECT_STATUS.ACTIVE, limit: 1000 }
+    });
+
+    const allProjects = projectsRes.data.projects;
+    const allProjectIds = new Set(allProjects.map((p: any) => p.id));
+
+    // 2. Lấy Task của User
+    const taskParams: any = { assigned_to_id: "me", status_id: "*", limit: 1000 };
+    if (taskDate) taskParams.created_on = taskDate;
+
+    const tasksRes = await axios.get(`${user.redmineUrl}/issues.json`, {
+      headers: { 'X-Redmine-API-Key': user.redmineApiKey },
+      params: taskParams
+    });
+
+    let allMyTasks = tasksRes.data.issues;
+
+    // --- CẢI TIẾN 1: Tìm kiếm Task theo ID hoặc Name ---
+    if (taskName) {
+      const tSearch = String(taskName).toLowerCase();
+      allMyTasks = allMyTasks.filter((t: any) =>
+        t.subject.toLowerCase().includes(tSearch) ||
+        t.id.toString().includes(tSearch) // Tìm kiếm ID theo kiểu chứa chuỗi (86 nằm trong 8690)
+      );
+    }
+
+    // --- Hàm dựng cây Task (Giữ nguyên logic của bạn nhưng tối ưu filter) ---
+    const buildTaskTree = (nodes: any[], parentId: number | null, allIdsInProject: Set<any>): any[] => {
+      return nodes
+        .filter((t: any) => {
+          const pId = t.parent ? t.parent.id : null;
+          return parentId === null
+            ? (!t.parent || !allIdsInProject.has(t.parent.id))
+            : (pId === parentId);
+        })
+        .map((t: any) => ({
+          ...t,
+          subtasks: buildTaskTree(nodes, t.id, allIdsInProject)
+        }));
+    };
+
+    // --- Hàm dựng cây Project ---
+    const buildProjectTree = (parentId: number | null): any[] => {
+      return allProjects
+        .filter((p: any) => {
+          const pId = p.parent ? p.parent.id : null;
+          return parentId === null
+            ? (!p.parent || !allProjectIds.has(p.parent.id))
+            : (pId === parentId);
+        })
+        .map((project: any) => {
+          const projectTasks = allMyTasks.filter((t: any) => t.project.id === project.id);
+          const projectTaskIds = new Set(projectTasks.map((t: any) => t.id));
+
+          return {
+            id: project.id,
+            name: project.name,
+            identifier: project.identifier,
+            tasks: buildTaskTree(projectTasks, null, projectTaskIds),
+            subProjects: buildProjectTree(project.id)
+          };
+        });
+    };
+
+    // 3. Dựng cây toàn bộ
+    let projectTree = buildProjectTree(null);
+
+    // --- CẢI TIẾN 2: Lọc đệ quy cho Project (ID hoặc Name) ---
+    if (projectName) {
+      const pSearch = String(projectName).toLowerCase();
+
+      const filterProjectRecursive = (list: any[]): any[] => {
+        return list
+          .map(p => ({
+            ...p,
+            subProjects: filterProjectRecursive(p.subProjects)
+          }))
+          .filter(p => {
+            const matchesName = p.name.toLowerCase().includes(pSearch);
+            const matchesId = p.id.toString().includes(pSearch); // Tìm kiếm ID project kiểu chứa chuỗi
+            const hasTasks = p.tasks.length > 0;
+            const hasMatchingChildren = p.subProjects.length > 0;
+
+            return matchesName || matchesId || hasMatchingChildren || hasTasks;
+          });
+      };
+      projectTree = filterProjectRecursive(projectTree);
+    }
+
+    res.json(projectTree);
+
+  } catch (error: any) {
+    console.error("Tree Data Error:", error.message);
+    res.status(500).json({ message: "Không thể lấy cấu trúc cây dữ liệu" });
+  }
+};

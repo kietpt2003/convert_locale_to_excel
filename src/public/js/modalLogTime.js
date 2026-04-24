@@ -1,5 +1,6 @@
 import { renderCalendar } from "./calendar.js";
 import { buildProjectTree } from "./redmine.js";
+import { fetchWithAuth } from "./redmine.js";
 
 let orderedTasks = [];
 let currentParentId = null;
@@ -24,9 +25,12 @@ export async function fetchTasksByProject(projectId) {
   taskSelect.disabled = true;
 
   try {
-    const res = await fetch(`/api/redmine/projects/${projectId}/tasks`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const res = await fetchWithAuth(
+      `/api/redmine/projects/${projectId}/tasks`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
     const data = await res.json();
 
     taskSelect.innerHTML = '<option value="">-- Select Task --</option>';
@@ -136,7 +140,7 @@ export function initModalEvents() {
 
     try {
       const token = localStorage.getItem("app_token");
-      const res = await fetch("/api/redmine/logtime", {
+      const res = await fetchWithAuth("/api/redmine/logtime", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -182,7 +186,7 @@ export async function loadModalProjects() {
 
   try {
     await loadActivities();
-    const res = await fetch(`/api/redmine/projects`, {
+    const res = await fetchWithAuth(`/api/redmine/projects`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -228,7 +232,7 @@ export async function loadActivities() {
   const token = localStorage.getItem("app_token");
 
   try {
-    const res = await fetch("/api/redmine/activities", {
+    const res = await fetchWithAuth("/api/redmine/activities", {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -256,36 +260,12 @@ export async function loadActivities() {
   }
 }
 
-export async function loadStatuses() {
-  const statusSelect = document.getElementById("modalStatusSelect");
-  const token = localStorage.getItem("app_token");
-
-  try {
-    const res = await fetch("/api/redmine/statuses", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-
-    statusSelect.innerHTML = "";
-    data.statuses.forEach((s) => {
-      const option = document.createElement("option");
-      option.value = s.id;
-      option.innerText = s.name;
-      // Mặc định chọn "New" (thường ID = 1)
-      if (s.id === 1) option.selected = true;
-      statusSelect.appendChild(option);
-    });
-  } catch (err) {
-    console.error("Load statuses error:", err);
-  }
-}
-
 export async function loadStatusesForCreate() {
   const statusSelect = document.getElementById("modalStatusSelect");
   const token = localStorage.getItem("app_token");
 
   try {
-    const res = await fetch("/api/redmine/statuses", {
+    const res = await fetchWithAuth("/api/redmine/statuses", {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -382,7 +362,7 @@ document.getElementById("btnConfirmCreate").onclick = async () => {
 
   try {
     const token = localStorage.getItem("app_token");
-    const res = await fetch(`/api/redmine/tasks`, {
+    const res = await fetchWithAuth(`/api/redmine/tasks`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

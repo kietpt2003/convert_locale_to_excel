@@ -14,7 +14,8 @@ import {
   getTaskStatuses,
   getTaskTrackers,
   getUserInfo,
-  logTime
+  logTime,
+  getProjectTaskTree
 } from '../controllers/redmine.controller.js';
 
 const router = Router();
@@ -34,5 +35,6 @@ router.get('/scan-parents', getTaskParents);
 router.get('/projects', getListProjects);
 router.get('/user/me', getUserInfo);
 router.post('/user/redmine-config', getRedmineConfig);
+router.get('/projects/tasks', getProjectTaskTree);
 
 export default router;
