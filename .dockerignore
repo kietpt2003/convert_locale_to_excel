@@ -4,3 +4,4 @@ yarn-error.log
 dist
 .env
 .git
+*.pem
