@@ -10,6 +10,7 @@ import {
   initQuickModalEvents,
   openQuickLogTime,
 } from "./projectRedmineExplorer.js";
+import { initCreateTaskTab } from "./tabCreateTask.js";
 
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
@@ -341,10 +342,14 @@ window.openTab = function (evt, tabName) {
   if (tabName === "explorer-tab") {
     loadFullProjectTree();
   }
+
+  if (tabName === "tabCreateTask") {
+    initCreateTaskTab();
+  }
 };
 
 // Hàm bổ trợ để highlight từ khóa
-function highlightText(text, query) {
+export function highlightText(text, query) {
   if (!query || !query.trim()) return text;
 
   // Escape các ký tự đặc biệt trong regex và tạo pattern (không phân biệt hoa thường)
