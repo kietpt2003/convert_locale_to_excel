@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Excel Status Editor</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="/css/style-excel-editor.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <a href="/index.html" class="btn-back" title="Go Back">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+        </a>
+        <div>
+          <h2>Excel Status Smart Editor</h2>
+          <p class="subtitle">
+            Key Management, compare value and export final Key File
+          </p>
+        </div>
+      </div>
+
+      <div class="control-bar">
+        <input
+          type="file"
+          id="excel-file"
+          accept=".xlsx, .xls"
+          style="display: none"
+        />
+        <button
+          class="btn-analyze"
+          onclick="document.getElementById('excel-file').click()"
+        >
+          📂 Import Excel
+        </button>
+
+        <div
+          style="height: 30px; width: 1px; background: #cbd5e1; margin: 0 10px"
+        ></div>
+
+        <input
+          type="number"
+          id="row-index"
+          placeholder="Index (0...)"
+          style="
+            width: 80px;
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+          "
+        />
+        <button class="btn-theme" id="add-row-btn">➕ Insert New Row</button>
+
+        <button class="btn-magic" id="export-btn" style="margin-left: auto">
+          💾 Download Final Key
+        </button>
+      </div>
+
+      <div class="main-layout">
+        <div class="editor-section">
+          <div class="section-header">
+            <span>🛠️ RAW DATA EDITOR</span>
+          </div>
+          <div
+            id="table-wrapper"
+            style="max-height: 70vh; overflow-y: auto; position: relative"
+          >
+            <table class="excel-table">
+              <thead>
+                <tr>
+                  <th width="30%">Key</th>
+                  <th width="25%">Old</th>
+                  <th width="25%">New</th>
+                  <th width="20%">Status</th>
+                </tr>
+              </thead>
+              <tbody id="excel-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="preview-section">
+          <div class="section-header">
+            <span>✨ FINAL PREVIEW (KEY & VALUE)</span>
+          </div>
+          <div id="preview-wrapper" style="max-height: 70vh; overflow-y: auto">
+            <table class="preview-table">
+              <tbody id="preview-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <button id="floating-insert-btn">➕</button>
+      <div id="insert-indicator"></div>
+    </div>
+
+    <script src="/js/excel-editor.js"></script>
+  </body>
+</html>

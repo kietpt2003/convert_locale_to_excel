@@ -1,0 +1,263 @@
+/* 1. Global Reset & Variables */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --primary: #0d9488;
+  --primary-hover: #0f766e;
+  --bg-main: #f8fafc;
+  --border-color: #e2e8f0;
+  --text-main: #1e293b;
+  /* Status Colors */
+  --bg-unchanged: #ffffff;
+  --bg-modified: #fef9c3;
+  --bg-removed: #fee2e2;
+  --bg-added: #dcfce7;
+  --text-modified: #854d0e;
+  --text-removed: #991b1b;
+  --text-added: #166534;
+}
+
+body {
+  background-color: var(--bg-main);
+  color: var(--text-main);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  padding: 20px 0;
+}
+
+.container {
+  width: 98%;
+  max-width: 1800px;
+  margin: 0 auto;
+}
+
+/* 2. Header & Back Button (Xịn hơn) */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.btn-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: #64748b;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.btn-back:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+  transform: translateX(-3px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* 3. Control Bar & Buttons */
+.control-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 20px;
+}
+
+.btn-theme,
+.btn-analyze,
+.btn-magic {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: 0.2s;
+}
+
+.btn-analyze {
+  background: #f1f5f9;
+  color: #475569;
+}
+.btn-theme {
+  background: var(--primary);
+  color: white;
+}
+.btn-magic {
+  background: #0f172a;
+  color: white;
+}
+
+/* 4. Layout & Editor */
+.main-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.editor-section,
+.preview-section {
+  flex: 1;
+  min-width: 0;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.section-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: #fcfcfc;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+/* 5. Table & Inputs */
+.excel-table,
+.preview-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.excel-table td {
+  vertical-align: top;
+  padding: 4px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.03);
+}
+
+.excel-table textarea,
+.excel-table select {
+  width: 100%;
+  background: transparent !important;
+  border: 1px solid transparent;
+  padding: 8px;
+  font-size: 13px;
+  border-radius: 4px;
+  color: inherit;
+}
+
+.excel-table textarea {
+  font-family: "Fira Code", monospace;
+  min-height: 42px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.excel-table textarea:focus,
+.excel-table select:focus {
+  background: white !important;
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+/* 6. Status Styling */
+tr[class*="row-"] {
+  border-left: 4px solid transparent;
+}
+.row-unchanged {
+  background-color: var(--bg-unchanged);
+}
+.row-modified {
+  background-color: var(--bg-modified);
+  border-left-color: #f59e0b;
+  color: var(--text-modified);
+}
+.row-added {
+  background-color: var(--bg-added);
+  border-left-color: #22c55e;
+  color: var(--text-added);
+}
+.row-removed {
+  background-color: var(--bg-removed);
+  border-left-color: #ef4444;
+  color: var(--text-removed);
+  opacity: 0.7;
+}
+.row-removed textarea {
+  text-decoration: line-through;
+}
+
+/* 7. Floating & Helpers */
+#floating-insert-btn {
+  position: absolute;
+  z-index: 9999;
+  display: none;
+  width: 28px;
+  height: 28px;
+  background: #f59e0b;
+  color: white;
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#insert-indicator {
+  position: absolute;
+  height: 2px;
+  background: #f59e0b;
+  z-index: 9998;
+  display: none;
+  pointer-events: none;
+}
+
+.preview-key {
+  color: var(--primary);
+  font-family: "Fira Code", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+.preview-val {
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 12px;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.shake-error {
+  animation: shake 0.3s ease-in-out;
+}
