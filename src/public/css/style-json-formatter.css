@@ -1,0 +1,92 @@
+textarea#json-output {
+  transition:
+    background-color 0.3s,
+    color 0.3s,
+    border-color 0.3s;
+}
+textarea#json-output.dark-mode {
+  background-color: #1e293b;
+  color: #f8fafc;
+  border-color: #334155;
+}
+.btn-theme {
+  background-color: #f0fdfa;
+  color: #0d9488;
+  border: 1px solid #99f6e4;
+}
+.btn-theme:hover {
+  background-color: #ccfbf1;
+}
+/* Style cho các thành phần JSON */
+.json-line {
+  display: block;
+}
+.json-key {
+  color: #be185d;
+  font-weight: bold;
+} /* Màu đỏ cho key */
+.json-string {
+  color: #059669;
+} /* Màu xanh cho string */
+.json-number {
+  color: #d97706;
+}
+.json-boolean {
+  color: #2563eb;
+}
+
+/* Toggle mũi tên */
+.toggle-btn {
+  cursor: pointer;
+  display: inline-block;
+  width: 20px;
+  color: #94a3b8;
+  user-select: none;
+}
+.toggle-btn:hover {
+  color: #334155;
+}
+.collapsed .json-content {
+  display: none;
+}
+.collapsed .json-ellipsis {
+  display: inline;
+  color: #94a3b8;
+}
+.json-ellipsis {
+  display: none;
+}
+
+/* Highlight Search */
+.search-highlight {
+  background-color: #fef08a;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px #facc15;
+}
+.search-highlight.current {
+  background-color: #facc15;
+  box-shadow: 0 0 0 2px #eab308;
+}
+
+/* Dark Mode cho vùng render */
+.dark-mode {
+  background-color: #0f172a !important;
+  color: #f8fafc;
+}
+.dark-mode .json-key {
+  color: #fb7185;
+}
+.dark-mode .json-string {
+  color: #4ade80;
+}
+
+.minify-view {
+  font-family: "Fira Code", monospace;
+  font-size: 13px;
+  padding: 10px;
+  color: #059669; /* Màu xanh đặc trưng của chuỗi JSON */
+}
+/* Trong chế độ Dark Mode */
+.dark-mode .minify-view {
+  color: #4ade80;
+}

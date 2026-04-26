@@ -5,28 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Smart JSON Formatter & TS Generator</title>
     <link rel="stylesheet" href="/css/style-svg-converter.css" />
-    <style>
-      /* Style riêng cho chế độ Dark Mode của ô Output */
-      textarea#json-output {
-        transition:
-          background-color 0.3s,
-          color 0.3s,
-          border-color 0.3s;
-      }
-      textarea#json-output.dark-mode {
-        background-color: #1e293b;
-        color: #f8fafc;
-        border-color: #334155;
-      }
-      .btn-theme {
-        background-color: #f0fdfa;
-        color: #0d9488;
-        border: 1px solid #99f6e4;
-      }
-      .btn-theme:hover {
-        background-color: #ccfbf1;
-      }
-    </style>
+    <link rel="stylesheet" href="/css/style-json-formatter.css" />
   </head>
   <body>
     <div class="container">
@@ -112,48 +91,89 @@
         <div class="panel right-panel">
           <div class="panel-header">
             <h3>2. Output</h3>
-            <div style="display: flex; gap: 10px">
-              <button class="btn-copy btn-theme" id="btn-theme-toggle">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
+            <div style="display: flex; gap: 10px; align-items: center">
+              <div
+                class="search-container"
+                id="search-bar"
+                style="
+                  display: none;
+                  display: flex;
+                  align-items: center;
+                  background: #fff;
+                  border: 1px solid #ddd;
+                  padding: 2px 8px;
+                  border-radius: 6px;
+                "
+              >
+                <input
+                  type="text"
+                  id="search-input"
+                  placeholder="Find..."
+                  style="
+                    border: none;
+                    outline: none;
+                    font-size: 13px;
+                    width: 100px;
+                  "
+                />
+                <span
+                  id="search-count"
+                  style="font-size: 12px; color: #666; margin: 0 5px"
+                  >0/0</span
                 >
-                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-                </svg>
+                <button
+                  id="btn-prev"
+                  style="
+                    border: none;
+                    background: none;
+                    cursor: pointer;
+                    padding: 0 2px;
+                  "
+                >
+                  ▲
+                </button>
+                <button
+                  id="btn-next"
+                  style="
+                    border: none;
+                    background: none;
+                    cursor: pointer;
+                    padding: 0 2px;
+                  "
+                >
+                  ▼
+                </button>
+              </div>
+
+              <button class="btn-copy btn-theme" id="btn-theme-toggle">
                 Dark Theme
               </button>
-              <button class="btn-copy" id="btn-copy-json">
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                  <path
-                    d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                  />
-                </svg>
-                Copy Result
-              </button>
+              <button class="btn-copy" id="btn-copy-json">Copy Result</button>
             </div>
           </div>
 
           <div id="status-box" class="status-box"></div>
 
-          <div class="output-container" style="height: 100%">
-            <textarea
+          <div
+            class="output-container"
+            style="
+              height: 100%;
+              overflow: auto;
+              background: #fff;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+            "
+          >
+            <div
               id="json-output"
-              readonly
-              placeholder="Result will appear here..."
-              style="height: 100%; flex: 1"
-            ></textarea>
+              class="json-render-area"
+              style="
+                padding: 15px;
+                font-family: &quot;Fira Code&quot;, monospace;
+                white-space: pre;
+                font-size: 14px;
+              "
+            ></div>
           </div>
         </div>
       </div>
