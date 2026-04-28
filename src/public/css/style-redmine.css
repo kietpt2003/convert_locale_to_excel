@@ -404,8 +404,8 @@ table tbody tr:hover {
 .calendar-days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 1px; /* Giảm gap để trông chuyên nghiệp hơn như một bảng lịch thực thụ */
-  background: #edf2f7; /* Màu nền cho đường kẻ giữa các ô */
+  gap: 1px;
+  background: #edf2f7;
   padding: 1px;
   border: 1px solid #edf2f7;
   border-radius: 8px;
@@ -413,18 +413,18 @@ table tbody tr:hover {
 }
 
 .day-cell {
-  height: 140px; /* Sửa từ min-height thành height cố định */
+  height: 140px;
   display: flex;
   flex-direction: column;
   position: relative;
   border: 1px solid #edf2f7;
-  padding: 6px; /* Tăng nhẹ padding cho thoáng */
+  padding: 6px;
   background: #fff;
   transition:
     transform 0.1s ease,
     background 0.2s,
     box-shadow 0.2s;
-  overflow: hidden; /* Đảm bảo nội dung không tràn ra ngoài */
+  overflow: hidden;
   box-sizing: border-box;
 }
 
