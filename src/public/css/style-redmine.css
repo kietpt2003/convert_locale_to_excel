@@ -26,8 +26,9 @@ body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: 320px 1fr;
-  gap: 25px;
+  grid-template-columns: 350px 1fr; /* Tăng nhẹ độ rộng sidebar */
+  gap: 20px;
+  align-items: start;
 }
 
 .card {
@@ -403,24 +404,28 @@ table tbody tr:hover {
 .calendar-days-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 5px;
-  background: #fcfcfc;
-  padding: 10px;
+  gap: 1px; /* Giảm gap để trông chuyên nghiệp hơn như một bảng lịch thực thụ */
+  background: #edf2f7; /* Màu nền cho đường kẻ giữa các ô */
+  padding: 1px;
+  border: 1px solid #edf2f7;
   border-radius: 8px;
+  overflow: hidden;
 }
 
 .day-cell {
-  min-height: 120px;
+  height: 140px; /* Sửa từ min-height thành height cố định */
   display: flex;
   flex-direction: column;
   position: relative;
   border: 1px solid #edf2f7;
-  padding: 4px;
+  padding: 6px; /* Tăng nhẹ padding cho thoáng */
   background: #fff;
   transition:
     transform 0.1s ease,
     background 0.2s,
     box-shadow 0.2s;
+  overflow: hidden; /* Đảm bảo nội dung không tràn ra ngoài */
+  box-sizing: border-box;
 }
 
 .day-cell:hover {
@@ -450,14 +455,15 @@ table tbody tr:hover {
 
 /* Log Tasks in Calendar */
 .log-list-container {
-  flex: 1;
-  overflow-y: auto;
-  max-height: 85px;
+  flex: 1; /* Chiếm toàn bộ phần còn lại của ô */
+  overflow-y: auto; /* Hiện thanh cuộn nếu nội dung quá dài */
+  margin-top: 4px;
   padding-right: 2px;
 }
 
+/* Tùy chỉnh thanh cuộn nhỏ gọn hơn để không chiếm diện tích */
 .log-list-container::-webkit-scrollbar {
-  width: 3px;
+  width: 4px;
 }
 .log-list-container::-webkit-scrollbar-thumb {
   background: #cbd5e0;
