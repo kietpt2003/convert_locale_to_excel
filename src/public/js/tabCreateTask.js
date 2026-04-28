@@ -109,21 +109,19 @@ async function handleTabCreateTask() {
     custom_fields: [{ id: epicFieldId, value: epicType }],
   };
 
-  console.log("check payload", payload);
-
   try {
-    // const res = await fetchWithAuth(`/api/redmine/tasks`, {
-    //   method: "POST",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: JSON.stringify(payload),
-    // });
-    // if (res.ok) {
-    //   alert("✅ Task Created!");
-    //   document.getElementById("tabTaskSubject").value = "";
-    //   fetchTasksForTab(projectId); // Refresh list
-    // }
+    const res = await fetchWithAuth(`/api/redmine/tasks`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      alert("✅ Task Created!");
+      document.getElementById("tabTaskSubject").value = "";
+      fetchTasksForTab(projectId); // Refresh list
+    }
   } catch (err) {
     alert("Create failed");
   }
