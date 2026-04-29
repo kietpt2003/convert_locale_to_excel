@@ -3,6 +3,7 @@ import { fetchWithAuth, buildProjectTree, highlightText } from "./redmine.js";
 let tabOrderedTasks = [];
 let allTabProjects = [];
 let allTabTasks = [];
+let currentCustomFieldConfigs = {};
 
 export async function initCreateTaskTab() {
   const pSearchInput = document.getElementById("tabProjectSearch");
@@ -45,7 +46,6 @@ export async function initCreateTaskTab() {
 }
 
 async function loadTabProjects() {
-  const token = localStorage.getItem("app_token");
   const res = await fetchWithAuth(`/api/redmine/projects`);
   const data = await res.json();
 
@@ -58,21 +58,16 @@ async function loadTabProjects() {
 
 async function fetchTasksForTab(projectId) {
   const tList = document.getElementById("tabParentTaskList");
-  const tSearchInput = document.getElementById("tabTaskSearch");
-
   if (!projectId) return;
 
-  // 1. Hiển thị Skeleton loading ngay lập tức
   tList.style.display = "block";
-  renderSkeleton("tabParentTaskList", 6); // Tạo 6 dòng loading
+  renderSkeleton("tabParentTaskList", 6);
 
   try {
     const res = await fetchWithAuth(`/api/redmine/projects/${projectId}/tasks`);
     const data = await res.json();
-
     allTabTasks = processTaskHierarchy(data.tasks);
-
-    // 2. Render dữ liệu thật (Sẽ xóa sạch Skeleton cũ)
+    tabOrderedTasks = allTabTasks; // Lưu lại để dùng sau
     renderTaskExplorer(allTabTasks);
   } catch (err) {
     tList.innerHTML =
@@ -80,36 +75,149 @@ async function fetchTasksForTab(projectId) {
   }
 }
 
+async function loadProjectOptions(projectId) {
+  // Disable form trong lúc load
+  toggleForm(false);
+
+  try {
+    // Gọi API filter của bạn (Đổi đường dẫn nếu backend của bạn cấu hình khác nhé)
+    const res = await fetchWithAuth(
+      `/api/redmine/projects/${projectId}/task-options`,
+    );
+    const result = await res.json();
+
+    if (result.success) {
+      const data = result.data;
+
+      // 1. Đổ dữ liệu các trường cơ bản
+      populateSelect("tabTrackerSelect", data.trackers, "5"); // 5 For default Task
+      populateSelect("tabStatusSelect", data.statuses);
+      populateSelect("tabPrioritySelect", data.priorities, "2"); // 2 For default Normal
+      populateSelect("tabDoneRatioSelect", data.doneRatios, "0"); // 0 For default 0%
+
+      // 2. Đổ dữ liệu Assignee và AUTO SELECT "ME"
+      const assigneeSelect = document.getElementById("tabAssigneeSelect");
+      assigneeSelect.innerHTML = '<option value="">-- Unassigned --</option>';
+      data.assignees.forEach((opt) => {
+        const option = new Option(opt.name, opt.id);
+        // Nếu API trả về "<< me >>" thì gán vào giá trị biến mặc định của hệ thống
+        if (opt.name.includes("<< me >>")) {
+          option.selected = true;
+          option.value = "me"; // Redmine api nhận 'me'
+        }
+        assigneeSelect.add(option);
+      });
+
+      // 3. Đổ dữ liệu Custom Fields (Epic Type, WBS)
+      currentCustomFieldConfigs = data.customFields || {};
+
+      if (currentCustomFieldConfigs["Epic Type"]) {
+        populateSelect(
+          "tabEpicTypeSelect",
+          currentCustomFieldConfigs["Epic Type"].options,
+          "",
+          "-- Select Epic Type --",
+        );
+      }
+
+      if (currentCustomFieldConfigs["WBS"]) {
+        populateSelect(
+          "tabWbsSelect",
+          currentCustomFieldConfigs["WBS"].options,
+          "",
+          "-- Select WBS --",
+        );
+      }
+
+      // Load xong thì mở khóa form
+      toggleForm(true);
+    }
+  } catch (error) {
+    console.error("Lỗi lấy option tạo task", error);
+    alert("Không thể tải cấu hình form của dự án này.");
+  }
+}
+
+// Helper: Đổ dữ liệu vào thẻ Select
+function populateSelect(
+  elementId,
+  optionsArray,
+  defaultVal = "",
+  placeholder = null,
+) {
+  const select = document.getElementById(elementId);
+  select.innerHTML = "";
+  if (placeholder) {
+    select.add(new Option(placeholder, ""));
+  }
+  optionsArray.forEach((opt) => {
+    const isSelected = opt.id === defaultVal;
+    select.add(new Option(opt.name, opt.id, isSelected, isSelected));
+  });
+}
+
+// Helper: Khóa/Mở khóa Form
+function toggleForm(isEnabled) {
+  const fields = [
+    "tabTaskSearch",
+    "tabTaskSubject",
+    "tabTrackerSelect",
+    "tabStatusSelect",
+    "tabPrioritySelect",
+    "tabAssigneeSelect",
+    "tabDoneRatioSelect",
+    "tabEpicTypeSelect",
+    "tabWbsSelect",
+    "btnConfirmTabCreate",
+  ];
+  fields.forEach((id) => {
+    document.getElementById(id).disabled = !isEnabled;
+  });
+}
+
 async function handleTabCreateTask() {
   const projectId = document.getElementById("tabProjectSelect").value;
   const parentId = document.getElementById("tabParentTaskSelect").value;
   const subject = document.getElementById("tabTaskSubject").value;
-  const statusId = document.getElementById("tabStatusSelect").value;
-  const epicType = document.getElementById("tabEpicTypeSelect").value;
 
   if (!projectId || !subject) {
     alert("Please fill Project and Subject!");
     return;
   }
 
-  // Tìm EPIC_TYPE_ID từ custom_fields của task cha hoặc mặc định
-  let epicFieldId = 1;
-  if (parentId) {
-    const parent = tabOrderedTasks.find((t) => t.id == parentId);
-    const field = parent?.custom_fields?.find((cf) => cf.name === "Epic Type");
-    if (field) epicFieldId = field.id;
-  }
-
   const payload = {
     project_id: projectId,
     subject: subject,
     parent_issue_id: parentId || null,
-    status_id: statusId,
-    assigned_to_id: "me",
-    custom_fields: [{ id: epicFieldId, value: epicType }],
+    tracker_id: document.getElementById("tabTrackerSelect").value,
+    status_id: document.getElementById("tabStatusSelect").value,
+    priority_id: document.getElementById("tabPrioritySelect").value,
+    assigned_to_id: document.getElementById("tabAssigneeSelect").value,
+    done_ratio: document.getElementById("tabDoneRatioSelect").value,
+    custom_fields: [], // Mảng chứa Epic, WBS...
   };
 
+  const epicVal = document.getElementById("tabEpicTypeSelect").value;
+  if (epicVal && currentCustomFieldConfigs["Epic Type"]) {
+    payload.custom_fields.push({
+      id: currentCustomFieldConfigs["Epic Type"].id,
+      value: epicVal,
+    });
+  }
+
+  const wbsVal = document.getElementById("tabWbsSelect").value;
+  if (wbsVal && currentCustomFieldConfigs["WBS"]) {
+    payload.custom_fields.push({
+      id: currentCustomFieldConfigs["WBS"].id,
+      value: wbsVal,
+    });
+  }
+
   try {
+    const btn = document.getElementById("btnConfirmTabCreate");
+    btn.innerText = "Creating...";
+    btn.disabled = true;
+
     const res = await fetchWithAuth(`/api/redmine/tasks`, {
       method: "POST",
       headers: {
@@ -124,6 +232,10 @@ async function handleTabCreateTask() {
     }
   } catch (err) {
     alert("Create failed");
+  } finally {
+    const btn = document.getElementById("btnConfirmTabCreate");
+    btn.innerText = "Create Task";
+    btn.disabled = false;
   }
 }
 
@@ -266,7 +378,7 @@ function flattenProjectTree(projects, level = 0) {
 // Hàm render danh sách Project kiểu Explorer
 function renderProjectExplorer(data, keyword = "") {
   const listBox = document.getElementById("tabProjectList");
-  const redmineBaseUrl = document.getElementById("redmineUrl").value; // Lấy URL base của bạn
+  const redmineBaseUrl = document.getElementById("modalRedmineUrl").value; // Lấy URL base của bạn
   listBox.innerHTML = "";
 
   data.forEach((p) => {
@@ -306,7 +418,7 @@ function renderProjectExplorer(data, keyword = "") {
 // Hàm render danh sách Task kiểu Explorer
 function renderTaskExplorer(data, keyword = "") {
   const listBox = document.getElementById("tabParentTaskList");
-  const redmineBaseUrl = document.getElementById("redmineUrl").value;
+  const redmineBaseUrl = document.getElementById("modalRedmineUrl").value;
   listBox.innerHTML = "";
 
   // Thêm option mặc định
@@ -364,25 +476,22 @@ function selectItem(type, item) {
     type === "project" ? "tabProjectList" : "tabParentTaskList",
   );
 
-  // Gán giá trị thực (ID) vào hidden input
   inputHidden.value = item.id;
-
-  // Hiển thị nhãn (Label) lên ô search
   searchInput.value = item.id
     ? `[${item.id}] ${item.name || item.subject}`
     : "";
-
-  // Ẩn danh sách sau khi chọn
   listBox.style.display = "none";
 
-  // Trigger logic tiếp theo
   if (type === "project") {
+    // 1. Tải danh sách Parent Task
     fetchTasksForTab(item.id);
-    // Reset task cũ khi đổi project
+
+    // 2. Tải cấu hình Form Tạo Task (Status, Priority, Assignee, Custom fields...)
+    loadProjectOptions(item.id);
+
+    // Reset task cũ
     document.getElementById("tabParentTaskSelect").value = "";
     document.getElementById("tabTaskSearch").value = "";
-  } else {
-    loadEpicTypeForTab(item.id);
   }
 }
 

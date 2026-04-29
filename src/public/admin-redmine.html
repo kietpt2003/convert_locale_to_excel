@@ -39,22 +39,22 @@
         <aside>
           <div class="card">
             <div class="card-header">
-              <h3>⚙️ Setup</h3>
+              <h3>⚙️ Preferences</h3>
             </div>
 
-            <label>Redmine URL</label>
-            <input
-              type="text"
-              id="redmineUrl"
-              placeholder="https://redmine.company.com"
-            />
-
-            <label>API Key</label>
-            <input
-              type="password"
-              id="redmineApiKey"
-              placeholder="Enter API access key..."
-            />
+            <button
+              class="btn-action"
+              id="btnUpdateRedmineCreds"
+              style="
+                width: 100%;
+                margin-bottom: 15px;
+                background: #edf2f7;
+                color: #2d3748;
+                border: 1px solid #cbd5e0;
+              "
+            >
+              🔑 Update Redmine Login
+            </button>
 
             <label>Watched Projects</label>
             <div class="project-list" id="projectList">
@@ -72,7 +72,7 @@
             </div>
 
             <button class="btn-save" id="btnSaveConfig">
-              Save Configuration
+              Save Preferences
             </button>
           </div>
         </aside>
@@ -237,6 +237,7 @@
                     id="tabTaskSearch"
                     class="explorer-search"
                     placeholder="🔍 Search task name or #ID..."
+                    disabled
                   />
                 </div>
                 <div id="tabParentTaskList" class="explorer-list-box"></div>
@@ -252,23 +253,81 @@
                   id="tabTaskSubject"
                   placeholder="Enter task title..."
                   class="form-control"
+                  disabled
                 />
               </div>
 
-              <div class="form-row">
-                <div class="form-group col-6">
-                  <label>Status</label>
-                  <select id="tabStatusSelect" class="form-control"></select>
+              <div class="form-row" style="display: flex; gap: 15px">
+                <div class="form-group" style="flex: 1">
+                  <label>Tracker <span class="required">*</span></label>
+                  <select
+                    id="tabTrackerSelect"
+                    class="form-control"
+                    disabled
+                  ></select>
                 </div>
-                <div class="form-group col-6">
+                <div class="form-group" style="flex: 1">
+                  <label>Status <span class="required">*</span></label>
+                  <select
+                    id="tabStatusSelect"
+                    class="form-control"
+                    disabled
+                  ></select>
+                </div>
+              </div>
+
+              <div class="form-row" style="display: flex; gap: 15px">
+                <div class="form-group" style="flex: 1">
+                  <label>Priority <span class="required">*</span></label>
+                  <select
+                    id="tabPrioritySelect"
+                    class="form-control"
+                    disabled
+                  ></select>
+                </div>
+                <div class="form-group" style="flex: 1">
+                  <label>Assignee</label>
+                  <select
+                    id="tabAssigneeSelect"
+                    class="form-control"
+                    disabled
+                  ></select>
+                </div>
+              </div>
+
+              <div class="form-row" style="display: flex; gap: 15px">
+                <div class="form-group" style="flex: 1">
+                  <label>% Done</label>
+                  <select
+                    id="tabDoneRatioSelect"
+                    class="form-control"
+                    disabled
+                  ></select>
+                </div>
+                <div class="form-group" style="flex: 1">
                   <label>Epic Type</label>
-                  <select id="tabEpicTypeSelect" class="form-control">
+                  <select id="tabEpicTypeSelect" class="form-control" disabled>
                     <option value="">-- Select Epic Type --</option>
                   </select>
                 </div>
               </div>
 
-              <button id="btnConfirmTabCreate" class="btn-primary">
+              <div class="form-row" style="display: flex; gap: 15px">
+                <div class="form-group" style="flex: 1">
+                  <label>WBS</label>
+                  <select id="tabWbsSelect" class="form-control" disabled>
+                    <option value="">-- Select WBS --</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex: 1"></div>
+              </div>
+
+              <button
+                id="btnConfirmTabCreate"
+                class="btn-primary"
+                style="margin-top: 15px; width: 100%"
+                disabled
+              >
                 Create Task
               </button>
             </div>
@@ -399,6 +458,92 @@
           />
 
           <button id="btnSubmitQuickLog" class="btn-save">Submit Log</button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="redmineLoginOverlay"
+      class="modal"
+      style="display: none; background: rgba(15, 23, 42, 0.9); z-index: 9999"
+    >
+      <div
+        class="modal-content"
+        style="
+          max-width: 400px;
+          margin-top: 10vh;
+          border: none;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        "
+      >
+        <div
+          class="modal-header"
+          style="
+            justify-content: center;
+            border-bottom: none;
+            padding-bottom: 0;
+          "
+        >
+          <h3 style="margin: 0; color: #1e293b; font-size: 1.4rem">
+            🔒 Redmine Access
+          </h3>
+        </div>
+        <div class="modal-body" style="padding-top: 10px">
+          <p
+            id="redmineLoginMessage"
+            style="
+              text-align: center;
+              color: #64748b;
+              font-size: 0.9rem;
+              margin-bottom: 25px;
+            "
+          >
+            Vui lòng đăng nhập để kết nối với hệ thống Redmine.
+          </p>
+
+          <label>Redmine URL</label>
+          <input
+            type="text"
+            id="modalRedmineUrl"
+            placeholder="https://redmine.company.com"
+            style="background: #f8fafc"
+          />
+
+          <label>Username</label>
+          <input
+            type="text"
+            id="modalRedmineUsername"
+            placeholder="Your Redmine username"
+            style="background: #f8fafc"
+          />
+
+          <label>Password</label>
+          <input
+            type="password"
+            id="modalRedminePassword"
+            placeholder="Your Redmine password"
+            style="background: #f8fafc"
+          />
+
+          <div
+            id="redmineLoginError"
+            style="
+              color: #ef4444;
+              font-size: 0.85rem;
+              margin-top: 10px;
+              display: none;
+              text-align: center;
+              font-weight: 500;
+            "
+          ></div>
+
+          <button
+            id="btnSubmitRedmineLogin"
+            class="btn-save"
+            style="margin-top: 25px; padding: 12px; font-size: 1rem"
+          >
+            Connect to Redmine
+          </button>
         </div>
       </div>
     </div>

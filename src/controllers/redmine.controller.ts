@@ -1,9 +1,15 @@
 import { Response } from 'express';
 import axios from 'axios';
+import * as cheerio from 'cheerio';
+import qs from 'qs';
+import CryptoJS from 'crypto-js';
 
-import { REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
+import { REDMINE_AUTHEN_ERROR, REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
-import { getTotalLoggedHours } from '../utils/redmineUtils.js';
+import { getTotalLoggedHours, getISOYearAndWeek } from '../utils/redmineUtils.js';
+import { RedmineAccount } from '../models/RedmineAccount.js';
+
+const ENCRYPT_SECRET = process.env.REDMINE_PWD_SECRET || '';
 
 export const logTime = async (req: any, res: Response) => {
   try {
@@ -156,7 +162,7 @@ export const getTasks = async (req: any, res: Response) => {
 
 export const createTask = async (req: any, res: Response) => {
   try {
-    const { project_id, subject, parent_issue_id, assigned_to_id, tracker_id } = req.body;
+    const { project_id, subject, parent_issue_id, assigned_to_id, tracker_id, custom_fields } = req.body;
 
     if (!project_id || !subject) {
       return res.status(400).json({ message: "Project ID and Subject are required" });
@@ -165,7 +171,7 @@ export const createTask = async (req: any, res: Response) => {
     const user = await AuthorizedUser.findOne({ email: req.user.email });
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    const issueData = {
+    const issueData: any = {
       issue: {
         project_id: project_id,
         subject: subject,
@@ -174,6 +180,10 @@ export const createTask = async (req: any, res: Response) => {
         tracker_id: tracker_id || REDMINE_TASK_TRACKER_ID.TASK.key,
       }
     };
+
+    if (custom_fields && Array.isArray(custom_fields)) {
+      issueData.issue.custom_fields = custom_fields;
+    }
 
     const response = await axios.post(
       `${user.redmineUrl}/issues.json`,
@@ -585,5 +595,268 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
   } catch (error: any) {
     console.error("Tree Data Error:", error.message);
     res.status(500).json({ message: "Không thể lấy cấu trúc cây dữ liệu" });
+  }
+};
+
+export const setupRedmineAccount = async (req: any, res: Response) => {
+  try {
+    const { username, password, redmineUrl } = req.body;
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    if (!user || !username || !password || !redmineUrl) {
+      return res.status(400).json({ message: "Please enter Company Redmine URL, Username, and Password for Redmine." });
+    }
+
+    let fetchedApiKey = "";
+    try {
+      // Gọi API mặc định của Redmine để lấy thông tin user hiện tại
+      const currentUserRes = await axios.get(`${redmineUrl}/users/current.json`, {
+        auth: {
+          username: username,
+          password: password
+        }
+      });
+      // Lấy API Key từ response
+      fetchedApiKey = currentUserRes.data?.user?.api_key || "";
+    } catch (apiErr: any) { }
+
+    const encryptedPassword = CryptoJS.AES.encrypt(password, ENCRYPT_SECRET).toString();
+
+    let account = await RedmineAccount.findOne({ userId: user.id });
+    if (!account) {
+      account = new RedmineAccount({ userId: user.id, redmineUrl, username, password: encryptedPassword });
+    } else {
+      account.username = username;
+      account.password = encryptedPassword;
+      account.redmineUrl = redmineUrl;
+    }
+
+    user.redmineUrl = redmineUrl;
+    if (fetchedApiKey) {
+      user.redmineApiKey = fetchedApiKey;
+    }
+    await user.save();
+
+    try {
+      await performRedmineLogin(account);
+      res.json({ success: true, message: "Login Redmine success!" });
+    } catch (err: any) {
+      if (err.message === REDMINE_AUTHEN_ERROR.INVALID_CREDENTIALS) {
+        return res.status(401).json({ message: "Wrong Redmine account or password." });
+      }
+      throw err;
+    }
+
+  } catch (error: any) {
+    res.status(500).json({ message: "Config Redmine failed. Please try again later." });
+  }
+};
+
+export const performRedmineLogin = async (accountDoc: any) => {
+  const loginUrl = `${accountDoc.redmineUrl}/login`;
+
+  const decryptedBytes = CryptoJS.AES.decrypt(accountDoc.password, ENCRYPT_SECRET);
+  const plainPassword = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+  if (!plainPassword) {
+    throw new Error(REDMINE_AUTHEN_ERROR.DECRYPTION_FAILED);
+  }
+
+  // Get CSRF Token
+  const getPageRes = await axios.get(loginUrl);
+  const rawCookies = getPageRes.headers['set-cookie'] || [];
+  const initCookieStr = rawCookies.map((c: any) => c.split(';')[0]).join('; ');
+  const $ = cheerio.load(getPageRes.data);
+  const authenticity_token = $('input[name="authenticity_token"]').val();
+
+  // Post Login
+  const formData = qs.stringify({
+    utf8: '✓',
+    authenticity_token,
+    username: accountDoc.username,
+    password: plainPassword,
+    login: 'Login'
+  });
+
+  try {
+    await axios.post(loginUrl, formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Cookie': initCookieStr,
+        'User-Agent': 'Mozilla/5.0...'
+      },
+      maxRedirects: 0
+    });
+    // If response status 200 -> login fail (Redmine return form login error)
+    throw new Error(REDMINE_AUTHEN_ERROR.INVALID_CREDENTIALS);
+  } catch (error: any) {
+    // Redmine 302 -> Success
+    if (error.response && error.response.status === 302) {
+      const authCookies = error.response.headers['set-cookie'];
+      const newCookie = authCookies.map((c: string) => c.split(';')[0]).join('; ');
+
+      // Cập nhật Database
+      accountDoc.sessionCookie = newCookie;
+      accountDoc.lastLogin = new Date();
+      await accountDoc.save();
+
+      return newCookie;
+    }
+    throw error;
+  }
+};
+
+export const getUsersFromReportHTML = async (req: any, res: any) => {
+  try {
+    const account = req.redmineAccount;
+
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Please link your Redmine Account first." });
+    }
+
+    const reportUrl = `${account.redmineUrl}/time_entries/report?criteria%5B%5D=project&set_filter=1&sort=spent_on%3Adesc&f%5B%5D=spent_on&op%5Bspent_on%5D=m&f%5B%5D=user_id&op%5Buser_id%5D=%3D&v%5Buser_id%5D%5B%5D=me&f%5B%5D=&group_by=&t%5B%5D=hours&t%5B%5D=&columns=week&criteria%5B%5D=&encoding=ISO-8859-1`;
+
+    const response = await res.fetchRedmine(reportUrl);
+
+    const $ = cheerio.load(response.data);
+    let userList: any[] = [];
+
+    $('script').each((i, el) => {
+      const scriptContent = $(el).html();
+      if (scriptContent && scriptContent.includes('var availableFilters =')) {
+        const match = scriptContent.match(/var availableFilters = (\{.*?\});/);
+
+        if (match && match[1]) {
+          try {
+            const filters = JSON.parse(match[1]);
+            const rawUsers = filters.user_id?.values || [];
+
+            rawUsers.forEach((u: any[]) => {
+              const name = u[0];
+              const id = u[1];
+              const status = u[2] || 'unknown';
+
+              if (id !== "me" && id !== "4" && !name.includes("<<")) {
+                userList.push({ id, name, status });
+              }
+            });
+          } catch (e) {
+            console.error("Failed to parse JSON from script", e);
+          }
+        }
+      }
+    });
+
+    userList.sort((a, b) => {
+      if (a.name < b.name) return -1;
+      if (a.name > b.name) return 1;
+      return 0;
+    });
+
+    res.json({
+      success: true,
+      count: userList.length,
+      users: userList
+    });
+
+  } catch (error: any) {
+    // Catch MIDDLEWARE errorand throw to FRONTEND for force user to login again
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) {
+      return res.status(401).json({
+        message: "Your Redmine login session has expired and cannot be automatically restored (you may have changed your password). Please log in to Redmine again."
+      });
+    }
+
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
+      return res.status(403).json({ message: "Bạn chưa thiết lập tài khoản Redmine." });
+    }
+
+    console.error("Scrape User Error:", error.message);
+    res.status(500).json({ message: "Lỗi khi bóc tách danh sách user từ HTML" });
+  }
+};
+
+export const getNewTaskOptions = async (req: any, res: any) => {
+  try {
+    const { project_id } = req.params;
+    const { assigned_to_id, parent_issue_id, tracker_id } = req.query;
+    const account = req.redmineAccount; // Đã được middleware gán vào
+
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Vui lòng liên kết tài khoản Redmine." });
+    }
+
+    // 1. Dựng URL có chứa đầy đủ param để Redmine render form chuẩn xác nhất
+    let targetUrl = `${account.redmineUrl}/projects/${project_id}/issues/new?`;
+
+    // Gắn các query parameters nếu Frontend có truyền lên
+    const params = new URLSearchParams();
+    if (assigned_to_id) params.append('issue[assigned_to_id]', String(assigned_to_id));
+    if (parent_issue_id) params.append('issue[parent_issue_id]', String(parent_issue_id));
+    if (tracker_id) params.append('issue[tracker_id]', String(tracker_id));
+
+    targetUrl += params.toString();
+
+    // 2. Gọi qua Interceptor để tự lo Session & Retry
+    const response = await res.fetchRedmine(targetUrl);
+    const $ = cheerio.load(response.data);
+
+    // Helper: Bóc tách <option> từ một <select> selector
+    const extractOptions = (selector: string) => {
+      const options: any[] = [];
+      $(selector).find('option').each((i, el) => {
+        const val = $(el).attr('value');
+        const text = $(el).text().trim();
+        // Bỏ qua các option rỗng (như "--- Vui lòng chọn ---")
+        if (val) {
+          options.push({ id: val, name: text });
+        }
+      });
+      return options;
+    };
+
+    // 3. Gom nhặt dữ liệu các trường cơ bản
+    const result: any = {
+      trackers: extractOptions('#issue_tracker_id'),
+      statuses: extractOptions('#issue_status_id'),
+      priorities: extractOptions('#issue_priority_id'),
+      assignees: extractOptions('#issue_assigned_to_id'),
+      doneRatios: extractOptions('#issue_done_ratio'),
+      customFields: {} // Nơi chứa Epic Type, WBS...
+    };
+
+    // 4. Tuyệt chiêu quét Custom Fields Động
+    // Redmine thường đặt id cho custom fields bắt đầu bằng "issue_custom_field_values_"
+    $('select[id^="issue_custom_field_values_"]').each((i, el) => {
+      const selectId = $(el).attr('id');
+
+      // Tìm nhãn (Label) mô tả cho cái Select này để biết nó là Epic Type hay WBS
+      let labelText = $(`label[for="${selectId}"]`).text().trim();
+
+      // Xóa dấu sao (*) bắt buộc nếu có
+      labelText = labelText.replace('*', '').trim();
+
+      if (labelText && selectId) {
+        result.customFields[labelText] = {
+          id: selectId.replace('issue_custom_field_values_', ''), // Trích xuất ra ID gốc của custom field
+          options: extractOptions(`#${selectId}`)
+        };
+      }
+    });
+
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error: any) {
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) {
+      return res.status(401).json({ message: "Your Redmine login session has expired. Please log in again." });
+    }
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
+    }
+
+    console.error("Fetch Task Options Error:", error.message);
+    res.status(500).json({ message: "Lỗi khi lấy dữ liệu form tạo task" });
   }
 };

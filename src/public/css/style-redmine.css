@@ -1055,3 +1055,21 @@ select.form-control[size] {
   width: 70%;
   height: 14px;
 }
+
+.btn-save.loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+.btn-save.loading::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: calc(50% - 10px);
+  left: calc(50% - 10px);
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}

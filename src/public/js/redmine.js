@@ -25,9 +25,41 @@ export async function fetchWithAuth(url, options = {}) {
 
   const response = await fetch(url, { ...options, headers });
 
-  if (response.status === 401 || response.status === 403) {
-    localStorage.removeItem("app_token");
-    window.location.replace("/index.html");
+  const clonedRes = response.clone();
+
+  if (
+    response.status === 400 ||
+    response.status === 401 ||
+    response.status === 403
+  ) {
+    try {
+      const data = await clonedRes.json();
+
+      // Kiểm tra xem đây là lỗi của Hệ thống JWT App hay lỗi của Redmine Account
+      const isRedmineError =
+        data.message &&
+        (data.message.includes("Redmine") ||
+          data.message.includes("liên kết") ||
+          data.message.includes("mật khẩu") ||
+          data.message.includes("cấu hình"));
+
+      if (isRedmineError) {
+        // Bật Modal ép buộc login Redmine
+        showRedmineLoginModal(data.message);
+        throw new Error("REDMINE_AUTH_REQUIRED"); // Cắt đứt luồng chạy hiện tại
+      } else {
+        // Lỗi JWT token hệ thống hết hạn -> Văng ra màn hình đăng nhập chính
+        localStorage.removeItem("app_token");
+        window.location.replace("/index.html");
+      }
+    } catch (e) {
+      if (e.message !== "REDMINE_AUTH_REQUIRED") {
+        localStorage.removeItem("app_token");
+        window.location.replace("/index.html");
+      } else {
+        throw e; // Ném lỗi ra để các hàm bên ngoài dừng chạy (tránh báo lỗi tè le trên UI)
+      }
+    }
   }
 
   return response;
@@ -39,6 +71,15 @@ export async function fetchWithAuth(url, options = {}) {
 export async function initApp() {
   // Load initial data
   await loadUserData();
+
+  document
+    .getElementById("btnSubmitRedmineLogin")
+    .addEventListener("click", handleRedmineLogin);
+  document
+    .getElementById("btnUpdateRedmineCreds")
+    .addEventListener("click", () =>
+      showRedmineLoginModal("Update your Redmine login information."),
+    );
 
   // Bind event for Save button
   const btnSave = document.getElementById("btnSaveConfig");
@@ -54,8 +95,11 @@ export async function initApp() {
   document.getElementById("nextMonth").onclick = () => changeMonth(1);
   document.getElementById("btnToday").onclick = () => goToToday();
 
-  // 3. Vẽ lịch lần đầu
-  await renderCalendar();
+  try {
+    await renderCalendar();
+  } catch (e) {
+    // Bỏ qua, Modal login đã bật rồi
+  }
 }
 
 // 1. Load configuration from MongoDB
@@ -67,19 +111,23 @@ export async function loadUserData() {
     const user = await res.json();
 
     if (user) {
-      document.getElementById("redmineUrl").value = user.redmineUrl || "";
-      document.getElementById("redmineApiKey").value = user.redmineApiKey || "";
+      document.getElementById("modalRedmineUrl").value = user.redmineUrl || "";
       document.getElementById("format").value =
         user.namingTemplate || "[PROJECT] | [PARENT] | Working";
 
-      if (user.redmineApiKey && user.redmineUrl) {
-        fetchRedmineProjects(user.watchedProjectIds || []);
+      const userDisplay = document.getElementById("user-display");
+      if (userDisplay) userDisplay.innerText = user.email;
+
+      if (!user.redmineUrl) {
+        showRedmineLoginModal(
+          "Welcome! You need to log in to Redmine to start using the tool.",
+        );
+        return;
       }
 
-      const userDisplay = document.getElementById("user-display");
-      if (userDisplay) {
-        userDisplay.innerText = user.email;
-      }
+      // Cố gắng gọi API lấy project. Nếu session chết hoặc chưa cấu hình,
+      // fetchWithAuth sẽ tự động quăng lỗi và bật Modal!
+      await fetchRedmineProjects(user.watchedProjectIds || []);
     }
   } catch (err) {
     console.error("Failed to load user data:", err);
@@ -88,38 +136,26 @@ export async function loadUserData() {
 
 // 2. Save configuration to MongoDB
 export async function saveRedmineConfig() {
-  const redmineUrl = document.getElementById("redmineUrl").value;
-  const redmineApiKey = document.getElementById("redmineApiKey").value;
   const namingTemplate = document.getElementById("format").value;
-
-  // Collect all checked project IDs
   const checkedBoxes = document.querySelectorAll(
     '#projectList input[type="checkbox"]:checked',
   );
   const watchedProjectIds = Array.from(checkedBoxes).map((cb) => cb.value);
 
   try {
+    // Không gửi redmineUrl hay API key lên đây nữa
     const res = await fetchWithAuth(`/api/redmine/user/redmine-config`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        redmineUrl,
-        redmineApiKey,
-        watchedProjectIds,
-        namingTemplate,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ watchedProjectIds, namingTemplate }),
     });
 
     if (res.ok) {
-      alert("Configuration saved successfully!");
-      // Refresh list to keep UI in sync
+      alert("Preferences saved successfully!");
       fetchRedmineProjects(watchedProjectIds);
     }
   } catch (err) {
-    alert("Server connection error!");
+    // Bỏ qua lỗi vì Interceptor đã xử lý
   }
 }
 
@@ -372,8 +408,8 @@ function renderProjectNodes(projects, parentElement, pQuery, tQuery) {
     const highlightedProjectId = highlightText(proj.id.toString(), pQuery);
     const highlightedName = highlightText(proj.name, pQuery);
 
-    // Lấy URL từ input hoặc config (giả sử có element id='redmineUrl')
-    const redmineBaseUrl = document.getElementById("redmineUrl").value;
+    // Lấy URL từ input hoặc config (giả sử có element id='modalRedmineUrl')
+    const redmineBaseUrl = document.getElementById("modalRedmineUrl").value;
     const projectLink = `${redmineBaseUrl}/projects/${proj?.identifier || ""}`;
 
     li.innerHTML = `
@@ -419,7 +455,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
     const highlightedTaskId = highlightText(task.id.toString(), tQuery);
 
     // Lấy URL Redmine từ config để làm link (giả sử bạn lưu trong window.redmineUrl)
-    const redmineUrl = document.getElementById("redmineUrl").value;
+    const redmineUrl = document.getElementById("modalRedmineUrl").value;
     const taskLink = `${redmineUrl}/issues/${task.id}`;
 
     li.innerHTML = `
@@ -494,6 +530,8 @@ async function loadFullProjectTree() {
 
     container.appendChild(rootList);
   } catch (error) {
+    console.log("check errr", error);
+
     container.innerHTML = '<div class="error-state">Error loading data</div>';
   }
 }
@@ -501,6 +539,72 @@ async function loadFullProjectTree() {
 const debouncedLoadTree = debounce(() => {
   loadFullProjectTree();
 }, 1000);
+
+// ==========================================
+// 2. REDMINE LOGIN MODAL LOGIC
+// ==========================================
+function showRedmineLoginModal(message = "Vui lòng đăng nhập Redmine.") {
+  const modal = document.getElementById("redmineLoginOverlay");
+  const msgEl = document.getElementById("redmineLoginMessage");
+  const errEl = document.getElementById("redmineLoginError");
+
+  msgEl.innerText = message;
+  errEl.style.display = "none";
+  modal.style.display = "block";
+}
+
+async function handleRedmineLogin() {
+  const urlParams = document.getElementById("modalRedmineUrl").value;
+  const usernameParams = document.getElementById("modalRedmineUsername").value;
+  const passwordParams = document.getElementById("modalRedminePassword").value;
+
+  const errEl = document.getElementById("redmineLoginError");
+  const btnSubmit = document.getElementById("btnSubmitRedmineLogin");
+
+  if (!urlParams || !usernameParams || !passwordParams) {
+    errEl.innerText = "Vui lòng nhập đầy đủ URL, Username và Password.";
+    errEl.style.display = "block";
+    return;
+  }
+
+  // Bật hiệu ứng loading
+  btnSubmit.classList.add("loading");
+  errEl.style.display = "none";
+
+  try {
+    const res = await fetchWithAuth(`/api/redmine/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        redmineUrl: urlParams,
+        username: usernameParams,
+        password: passwordParams,
+      }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      // Thành công! Đóng modal và Refresh lại toàn bộ dữ liệu trên trang
+      document.getElementById("redmineLoginOverlay").style.display = "none";
+      alert("Kết nối Redmine thành công!");
+
+      // Reload lại app để cập nhật data bằng Session Cookie mới
+      window.location.reload();
+    } else {
+      errEl.innerText =
+        data.message || "Sai mật khẩu hoặc cấu hình không đúng.";
+      errEl.style.display = "block";
+    }
+  } catch (err) {
+    if (err.message !== "REDMINE_AUTH_REQUIRED") {
+      errEl.innerText = "Lỗi kết nối máy chủ!";
+      errEl.style.display = "block";
+    }
+  } finally {
+    btnSubmit.classList.remove("loading");
+  }
+}
 
 // Lắng nghe sự kiện search
 document

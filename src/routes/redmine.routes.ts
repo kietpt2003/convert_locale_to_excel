@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { verifyToken } from '../middleware/validation.js';
+import { redmineInterceptor } from '../middleware/redmine.js'; // THÊM IMPORT NÀY
 import {
   createSubTask,
   createTask,
@@ -15,7 +16,10 @@ import {
   getTaskTrackers,
   getUserInfo,
   logTime,
-  getProjectTaskTree
+  getProjectTaskTree,
+  setupRedmineAccount,
+  getUsersFromReportHTML,
+  getNewTaskOptions
 } from '../controllers/redmine.controller.js';
 
 const router = Router();
@@ -36,5 +40,8 @@ router.get('/projects', getListProjects);
 router.get('/user/me', getUserInfo);
 router.post('/user/redmine-config', getRedmineConfig);
 router.get('/projects/tasks', getProjectTaskTree);
+router.post('/login', setupRedmineAccount);
+router.get('/user/all', redmineInterceptor, getUsersFromReportHTML);
+router.get('/projects/:project_id/task-options', redmineInterceptor, getNewTaskOptions);
 
 export default router;
