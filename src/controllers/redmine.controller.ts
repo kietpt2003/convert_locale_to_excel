@@ -483,12 +483,20 @@ export const getUserInfo = async (req: any, res: Response) => {
 
     const account = await RedmineAccount.findOne({ userId: user._id });
 
+    const decryptedBytes = CryptoJS.AES.decrypt(account?.password || "", ENCRYPT_SECRET);
+    const plainPassword = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+    if (!plainPassword) {
+      throw new Error(REDMINE_AUTHEN_ERROR.DECRYPTION_FAILED);
+    }
+
     res.json({
       email: user.email,
       role: user.role,
       redmineProfile: account?.redmineUserId ? {
         id: account.redmineUserId,
         login: account.login,
+        password: plainPassword,
         firstname: account.firstname,
         lastname: account.lastname,
         fullName: `${account.lastname || ''} ${account.firstname || ''}`.trim(),

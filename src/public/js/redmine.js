@@ -72,14 +72,52 @@ export async function initApp() {
   // Load initial data
   await loadUserData();
 
+  // Event Submit form
   document
     .getElementById("btnSubmitRedmineLogin")
     .addEventListener("click", handleRedmineLogin);
+
+  // Open update login redmine fỏm event
   document
     .getElementById("btnUpdateRedmineCreds")
     .addEventListener("click", () =>
-      showRedmineLoginModal("Update your Redmine login information."),
+      showRedmineLoginModal("Update your Redmine login information.", true),
     );
+
+  //Event press close modal login redmine
+  document.getElementById("closeRedmineModal").addEventListener("click", () => {
+    document.getElementById("redmineLoginOverlay").style.display = "none";
+  });
+
+  // Event SHOW/HIDE PASSWORD
+  const togglePasswordBtn = document.getElementById("togglePasswordBtn");
+  const passwordInput = document.getElementById("modalRedminePassword");
+  if (togglePasswordBtn && passwordInput) {
+    togglePasswordBtn.addEventListener("click", () => {
+      const isPassword = passwordInput.getAttribute("type") === "password";
+
+      passwordInput.setAttribute("type", isPassword ? "text" : "password");
+
+      // Change Icon
+      if (isPassword) {
+        // Icon Eye-off
+        togglePasswordBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"></path>
+            <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"></path>
+            <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"></path>
+            <line x1="2" y1="2" x2="22" y2="22"></line>
+          </svg>`;
+      } else {
+        // Icon Eye
+        togglePasswordBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>`;
+      }
+    });
+  }
 
   // Bind event for Save button
   const btnSave = document.getElementById("btnSaveConfig");
@@ -111,11 +149,18 @@ export async function loadUserData() {
     const user = await res.json();
 
     if (user) {
+      window.currentRedmineUrl = user?.redmineProfile?.redmineUrl || "";
+
       document.getElementById("modalRedmineUrl").value =
         user?.redmineProfile?.redmineUrl || "";
       document.getElementById("format").value =
         user?.redmineProfile?.namingTemplate ||
         "[PROJECT] | [PARENT] | Working";
+
+      document.getElementById("modalRedmineUsername").value =
+        user?.redmineProfile?.login || "";
+      document.getElementById("modalRedminePassword").value =
+        user?.redmineProfile?.password || "";
 
       const userDisplay = document.getElementById("user-display");
       if (userDisplay)
@@ -546,14 +591,24 @@ const debouncedLoadTree = debounce(() => {
 // ==========================================
 // 2. REDMINE LOGIN MODAL LOGIC
 // ==========================================
-function showRedmineLoginModal(message = "Vui lòng đăng nhập Redmine.") {
+function showRedmineLoginModal(
+  message = "Vui lòng đăng nhập Redmine.",
+  isUpdateMode = false,
+) {
   const modal = document.getElementById("redmineLoginOverlay");
   const msgEl = document.getElementById("redmineLoginMessage");
   const errEl = document.getElementById("redmineLoginError");
+  const closeBtn = document.getElementById("closeRedmineModal");
 
   msgEl.innerText = message;
   errEl.style.display = "none";
   modal.style.display = "block";
+
+  if (isUpdateMode) {
+    closeBtn.style.display = "block";
+  } else {
+    closeBtn.style.display = "none";
+  }
 }
 
 async function handleRedmineLogin() {

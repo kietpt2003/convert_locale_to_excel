@@ -479,14 +479,36 @@
         <div
           class="modal-header"
           style="
-            justify-content: center;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             border-bottom: none;
             padding-bottom: 0;
           "
         >
-          <h3 style="margin: 0; color: #1e293b; font-size: 1.4rem">
+          <h3
+            style="
+              margin: 0;
+              padding: 0;
+              border: none;
+              color: #1e293b;
+              font-size: 1.4rem;
+            "
+          >
             🔒 Redmine Access
           </h3>
+          <span
+            id="closeRedmineModal"
+            class="close-modal"
+            style="
+              display: none;
+              font-size: 28px;
+              color: #94a3b8;
+              cursor: pointer;
+              line-height: 1;
+            "
+            >&times;</span
+          >
         </div>
         <div class="modal-body" style="padding-top: 10px">
           <p
@@ -518,12 +540,53 @@
           />
 
           <label>Password</label>
-          <input
-            type="password"
-            id="modalRedminePassword"
-            placeholder="Your Redmine password"
-            style="background: #f8fafc"
-          />
+          <div style="position: relative">
+            <input
+              type="password"
+              id="modalRedminePassword"
+              placeholder="Your Redmine password"
+              style="
+                background: #f8fafc;
+                padding-right: 40px;
+                width: 100%;
+                margin: 8px 0;
+              "
+            />
+            <button
+              type="button"
+              id="togglePasswordBtn"
+              style="
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
+                background: none;
+                border: none;
+                cursor: pointer;
+                color: #64748b;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              "
+            >
+              <svg
+                id="eyeIcon"
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
 
           <div
             id="redmineLoginError"

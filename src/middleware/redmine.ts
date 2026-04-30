@@ -7,8 +7,8 @@ import { REDMINE_AUTHEN_ERROR } from "../constants/redmine.js";
 
 export const redmineInterceptor = async (req: any, res: any, next: any) => {
   const user = await AuthorizedUser.findOne({ email: req.user.email });
-  if (!user || !user.redmineApiKey || !user.redmineUrl) {
-    return res.status(400).json({ message: "Missing Redmine Configuration" });
+  if (!user) {
+    return res.status(400).json({ message: "User not found." });
   }
 
   const account = await RedmineAccount.findOne({ userId: user?.id });
