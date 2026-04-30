@@ -158,7 +158,7 @@ export async function loadUserData() {
         "[PROJECT] | [PARENT] | Working";
 
       document.getElementById("modalRedmineUsername").value =
-        user?.redmineProfile?.login || "";
+        user?.redmineProfile?.login || "Anonymous user";
       document.getElementById("modalRedminePassword").value =
         user?.redmineProfile?.password || "";
 
@@ -191,7 +191,6 @@ export async function saveRedmineConfig() {
   const watchedProjectIds = Array.from(checkedBoxes).map((cb) => cb.value);
 
   try {
-    // Không gửi redmineUrl hay API key lên đây nữa
     const res = await fetchWithAuth(`/api/redmine/user/redmine-config`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -202,9 +201,7 @@ export async function saveRedmineConfig() {
       alert("Preferences saved successfully!");
       fetchRedmineProjects(watchedProjectIds);
     }
-  } catch (err) {
-    // Bỏ qua lỗi vì Interceptor đã xử lý
-  }
+  } catch (err) {}
 }
 
 // 3. Fetch projects (Now using the proxy endpoint to avoid CORS)
@@ -502,9 +499,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
     const highlightedSubject = highlightText(task.subject, tQuery);
     const highlightedTaskId = highlightText(task.id.toString(), tQuery);
 
-    // Lấy URL Redmine từ config để làm link (giả sử bạn lưu trong window.redmineUrl)
-    const redmineUrl = document.getElementById("modalRedmineUrl").value;
-    const taskLink = `${redmineUrl}/issues/${task.id}`;
+    const taskLink = `${window.currentRedmineUrl}/issues/${task.id}`;
 
     li.innerHTML = `
       <div class="tree-row">

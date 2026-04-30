@@ -378,7 +378,6 @@ function flattenProjectTree(projects, level = 0) {
 // Hàm render danh sách Project kiểu Explorer
 function renderProjectExplorer(data, keyword = "") {
   const listBox = document.getElementById("tabProjectList");
-  const redmineBaseUrl = document.getElementById("modalRedmineUrl").value; // Lấy URL base của bạn
   listBox.innerHTML = "";
 
   data.forEach((p) => {
@@ -398,7 +397,7 @@ function renderProjectExplorer(data, keyword = "") {
     const icon = p.level === 0 ? "📂" : "📁";
 
     // Tạo link cho Project
-    const projectLink = `${redmineBaseUrl}/projects/${p?.identifier || ""}`;
+    const projectLink = `${window.currentRedmineUrl}/projects/${p?.identifier || ""}`;
 
     div.innerHTML = `
         <span class="label" style="${p.level === 0 ? "font-weight:bold" : ""}">
@@ -418,7 +417,6 @@ function renderProjectExplorer(data, keyword = "") {
 // Hàm render danh sách Task kiểu Explorer
 function renderTaskExplorer(data, keyword = "") {
   const listBox = document.getElementById("tabParentTaskList");
-  const redmineBaseUrl = document.getElementById("modalRedmineUrl").value;
   listBox.innerHTML = "";
 
   // Thêm option mặc định
@@ -447,7 +445,7 @@ function renderTaskExplorer(data, keyword = "") {
     const icon = t.parent ? "🔹" : "📦";
 
     // Tạo link cho Task
-    const taskLink = `${redmineBaseUrl}/issues/${t.id}`;
+    const taskLink = `${window.currentRedmineUrl}/issues/${t.id}`;
 
     div.innerHTML = `
             <span class="label">
