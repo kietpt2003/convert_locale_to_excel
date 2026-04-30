@@ -4,7 +4,6 @@ import {
   goToToday,
   initQuickSelectors,
 } from "./calendar.js";
-import { initModalEvents } from "./modalLogTime.js";
 import { debounce } from "./debounce.js";
 import {
   initQuickModalEvents,
@@ -126,7 +125,6 @@ export async function initApp() {
   }
 
   initQuickSelectors();
-  initModalEvents();
   initQuickModalEvents();
 
   document.getElementById("prevMonth").onclick = () => changeMonth(-1);

@@ -559,27 +559,6 @@ table tbody tr:hover {
   display: none;
 }
 
-.btn-quick-add {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: none;
-  background: #3182ce;
-  color: white;
-  font-size: 12px;
-  cursor: pointer;
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-
-.day-cell:hover .btn-quick-add {
-  display: flex;
-}
-
 /* Calendar Status Colors */
 .status-full {
   background-color: #f0fff4;
@@ -722,34 +701,6 @@ table tbody tr:hover {
   cursor: pointer;
   font-size: 24px;
   color: #aaa;
-}
-
-.task-selector-group {
-  display: flex;
-  gap: 8px;
-}
-
-.btn-small-plus {
-  background: #4299e1;
-  color: white;
-  width: 42px;
-  border-radius: 6px;
-  font-size: 1.2rem;
-  padding: 0;
-}
-
-/* Modal Select Options Styling */
-#modalTaskSelect {
-  font-family: "Consolas", "Monaco", "Cascadia Code", "Courier New", monospace;
-  font-size: 13px;
-  color: #2d3748;
-  line-height: 1.5;
-}
-
-#modalTaskSelect option {
-  background-color: #fff;
-  padding: 8px 5px;
-  border-bottom: 1px solid #edf2f7;
 }
 
 /* Tab Styling */

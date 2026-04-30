@@ -1,5 +1,3 @@
-import { loadModalProjects } from "./modalLogTime.js";
-
 let currentViewDate = new Date();
 
 export async function changeMonth(offset) {
@@ -97,9 +95,7 @@ export async function renderCalendar() {
         }
       }
 
-      htmlBuffer.push(
-        `</div><button class="btn-quick-add" onclick="openLogModal('${dateStr}', ${dayData?.totalHours || 0})">+</button>`,
-      );
+      htmlBuffer.push(`</div>`);
 
       dayCell.innerHTML = htmlBuffer.join("");
       fragment.appendChild(dayCell);
@@ -209,18 +205,3 @@ function syncSelectors() {
     sYear.value = currentViewDate.getFullYear();
   }
 }
-
-window.openLogModal = async (date, currentHours) => {
-  window.currentSelectedDate = date;
-
-  const modal = document.getElementById("logTimeModal");
-  document.getElementById("modalTitle").innerText = `Log Time: ${date}`;
-  document.getElementById("modalHours").value = 8 - currentHours;
-
-  const taskSelect = document.getElementById("modalTaskSelect");
-  taskSelect.innerHTML = '<option value="">-- Select Task --</option>';
-  taskSelect.disabled = true;
-
-  modal.style.display = "block";
-  loadModalProjects();
-};
