@@ -109,22 +109,10 @@ export async function autoLogTime(
   }
 }
 
-export const getISOYearAndWeek = (dateString: string): string => {
-  const date = new Date(dateString);
-  date.setHours(0, 0, 0, 0);
+export const normalizeUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
 
-  // Đưa ngày về ngày Thứ Năm của tuần hiện tại (Thứ Năm quyết định năm của tuần ISO)
-  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-
-  // Ngày 4 tháng 1 luôn nằm trong tuần 1 của năm
-  const week1 = new Date(date.getFullYear(), 0, 4);
-
-  // Tính số lượng tuần
-  const weekNumber = 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-
-  const year = date.getFullYear();
-  // Đảm bảo tuần luôn có 2 chữ số (VD: 09, 14)
-  const weekStr = weekNumber.toString().padStart(2, '0');
-
-  return `${year}-${weekStr}`; // Kết quả: "2026-14"
+  return url
+    .trim()
+    .replace(/^\/+|\/+$/g, ''); // Regex: Xóa tất cả '/' ở bắt đầu (^) hoặc kết thúc ($)
 };

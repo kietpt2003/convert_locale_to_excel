@@ -4,12 +4,19 @@ import * as cheerio from 'cheerio';
 import qs from 'qs';
 import CryptoJS from 'crypto-js';
 
-import { REDMINE_AUTHEN_ERROR, REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
+import { ACCOUNT_AUTHEN_ERROR, REDMINE_AUTHEN_ERROR, REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
-import { getTotalLoggedHours, getISOYearAndWeek } from '../utils/redmineUtils.js';
+import { getTotalLoggedHours, normalizeUrl } from '../utils/redmineUtils.js';
 import { RedmineAccount } from '../models/RedmineAccount.js';
 
 const ENCRYPT_SECRET = process.env.REDMINE_PWD_SECRET || '';
+
+const getRedmineAccount = async (email: string) => {
+  const user = await AuthorizedUser.findOne({ email });
+  if (!user) throw new Error(ACCOUNT_AUTHEN_ERROR.USER_NOT_FOUND);
+  const account = await RedmineAccount.findOne({ userId: user._id });
+  return account;
+};
 
 export const logTime = async (req: any, res: Response) => {
   try {
@@ -19,8 +26,8 @@ export const logTime = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Missing required fields: issue_id, hours, or spent_on" });
     }
 
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user || !user.redmineApiKey || !user.redmineUrl) {
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey || !account.redmineUrl) {
       return res.status(401).json({ message: "Redmine configuration not found for this user" });
     }
 
@@ -35,11 +42,11 @@ export const logTime = async (req: any, res: Response) => {
     };
 
     const response = await axios.post(
-      `${user.redmineUrl}/time_entries.json`,
+      `${account.redmineUrl}/time_entries.json`,
       logData,
       {
         headers: {
-          "X-Redmine-API-Key": user.redmineApiKey,
+          "X-Redmine-API-Key": account.redmineApiKey,
           "Content-Type": "application/json"
         }
       }
@@ -51,6 +58,10 @@ export const logTime = async (req: any, res: Response) => {
     });
 
   } catch (error: any) {
+    if (error.message === ACCOUNT_AUTHEN_ERROR.USER_NOT_FOUND) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     console.error("Log Time Error:", error.response?.data || error.message);
 
     const redmineErrors = error.response?.data?.errors;
@@ -71,10 +82,10 @@ export const logTime = async (req: any, res: Response) => {
 export const getTasks = async (req: any, res: Response) => {
   try {
     const { projectId } = req.params;
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
+    const account = await getRedmineAccount(req.user.email);
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!account || !account.redmineApiKey || !account.redmineUrl) {
+      return res.status(401).json({ message: "Missing Redmine Configuration" });
     }
 
     const commonParams = {
@@ -85,13 +96,13 @@ export const getTasks = async (req: any, res: Response) => {
     };
 
     const [parentRes, myTasksRes] = await Promise.all([
-      axios.get(`${user.redmineUrl}/issues.json`, {
+      axios.get(`${account.redmineUrl}/issues.json`, {
         params: { ...commonParams, parent_id: "!*" },
-        headers: { "X-Redmine-API-Key": user.redmineApiKey },
+        headers: { "X-Redmine-API-Key": account.redmineApiKey },
       }),
-      axios.get(`${user.redmineUrl}/issues.json`, {
+      axios.get(`${account.redmineUrl}/issues.json`, {
         params: { ...commonParams, assigned_to_id: "me" },
-        headers: { "X-Redmine-API-Key": user.redmineApiKey },
+        headers: { "X-Redmine-API-Key": account.redmineApiKey },
       }),
     ]);
 
@@ -118,8 +129,8 @@ export const getTasks = async (req: any, res: Response) => {
     if (missingParentIds.length > 0) {
       const missingResponses = await Promise.all(
         missingParentIds.map(id =>
-          axios.get(`${user.redmineUrl}/issues/${id}.json`, {
-            headers: { "X-Redmine-API-Key": user.redmineApiKey }
+          axios.get(`${account.redmineUrl}/issues/${id}.json`, {
+            headers: { "X-Redmine-API-Key": account.redmineApiKey }
           }).catch(() => null)
         )
       );
@@ -134,7 +145,7 @@ export const getTasks = async (req: any, res: Response) => {
 
     const tasksWithDetails = await Promise.all(
       combinedIssues.map(async (issue: any) => {
-        const loggedToday = await getTotalLoggedHours(user.redmineUrl, issue.id, today, user.redmineApiKey);
+        const loggedToday = await getTotalLoggedHours(account.redmineUrl, issue.id, today, account.redmineApiKey);
 
         return {
           id: issue.id,
@@ -168,8 +179,10 @@ export const createTask = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Project ID and Subject are required" });
     }
 
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey || !account.redmineUrl) {
+      return res.status(401).json({ message: "Missing Redmine Configuration" });
+    }
 
     const issueData: any = {
       issue: {
@@ -186,11 +199,11 @@ export const createTask = async (req: any, res: Response) => {
     }
 
     const response = await axios.post(
-      `${user.redmineUrl}/issues.json`,
+      `${account.redmineUrl}/issues.json`,
       issueData,
       {
         headers: {
-          "X-Redmine-API-Key": user.redmineApiKey,
+          "X-Redmine-API-Key": account.redmineApiKey,
           "Content-Type": "application/json"
         }
       }
@@ -210,12 +223,14 @@ export const createTask = async (req: any, res: Response) => {
 
 export const getTaskPriorities = async (req: any, res: Response) => {
   try {
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey) {
+      return res.status(401).json({ message: "Missing Config" });
+    }
 
-    const response = await axios.get(`${user.redmineUrl}/enumerations/issue_priorities.json`, {
+    const response = await axios.get(`${account.redmineUrl}/enumerations/issue_priorities.json`, {
       headers: {
-        "X-Redmine-API-Key": user.redmineApiKey,
+        "X-Redmine-API-Key": account.redmineApiKey,
         "Content-Type": "application/json"
       },
     });
@@ -231,12 +246,14 @@ export const getTaskPriorities = async (req: any, res: Response) => {
 
 export const getTaskActivities = async (req: any, res: Response) => {
   try {
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey) {
+      return res.status(401).json({ message: "Missing Config" });
+    }
 
-    const response = await axios.get(`${user.redmineUrl}/enumerations/time_entry_activities.json`, {
+    const response = await axios.get(`${account.redmineUrl}/enumerations/time_entry_activities.json`, {
       headers: {
-        "X-Redmine-API-Key": user.redmineApiKey,
+        "X-Redmine-API-Key": account.redmineApiKey,
         "Content-Type": "application/json"
       },
     });
@@ -252,12 +269,14 @@ export const getTaskActivities = async (req: any, res: Response) => {
 
 export const getTaskStatuses = async (req: any, res: Response) => {
   try {
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey) {
+      return res.status(401).json({ message: "Missing Config" });
+    }
 
-    const response = await axios.get(`${user.redmineUrl}/issue_statuses.json`, {
+    const response = await axios.get(`${account.redmineUrl}/issue_statuses.json`, {
       headers: {
-        "X-Redmine-API-Key": user.redmineApiKey,
+        "X-Redmine-API-Key": account.redmineApiKey,
         "Content-Type": "application/json"
       },
     });
@@ -272,17 +291,18 @@ export const getTaskStatuses = async (req: any, res: Response) => {
 export const getMonthlyHours = async (req: any, res: Response) => {
   try {
     const { month, year } = req.query; // Ex: month=4, year=2026
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey) {
+      return res.status(401).json({ message: "Missing Config" });
+    }
 
     // Calculate start date and end date of month
     const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
     const toDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0];
 
-    const timeEntriesRes = await axios.get(`${user.redmineUrl}/time_entries.json`, {
+    const timeEntriesRes = await axios.get(`${account.redmineUrl}/time_entries.json`, {
       params: { user_id: "me", from: fromDate, to: toDate, limit: 1000 },
-      headers: { "X-Redmine-API-Key": user.redmineApiKey }
+      headers: { "X-Redmine-API-Key": account.redmineApiKey }
     });
 
     const entries = timeEntriesRes.data.time_entries;
@@ -291,9 +311,9 @@ export const getMonthlyHours = async (req: any, res: Response) => {
     const issueMap: Record<number, string> = {};
 
     if (issueIds.length > 0) {
-      const issuesRes = await axios.get(`${user.redmineUrl}/issues.json`, {
+      const issuesRes = await axios.get(`${account.redmineUrl}/issues.json`, {
         params: { issue_id: issueIds.join(','), limit: 100 },
-        headers: { "X-Redmine-API-Key": user.redmineApiKey }
+        headers: { "X-Redmine-API-Key": account.redmineApiKey }
       });
 
       issuesRes.data.issues.forEach((is: any) => {
@@ -327,7 +347,7 @@ export const getMonthlyHours = async (req: any, res: Response) => {
         totalHours: dailyData[date].totalHours,
         isFull: dailyData[date].totalHours >= 8,
         logs: dailyData[date].logs,
-        redmineUrl: user.redmineUrl
+        redmineUrl: account.redmineUrl
       };
       return acc;
     }, {});
@@ -342,14 +362,12 @@ export const getMonthlyHours = async (req: any, res: Response) => {
 export const createSubTask = async (req: any, res: Response) => {
   try {
     const { parentId, projectId, subject, trackerId } = req.body;
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-
-    if (!user) {
-      res.status(404).json({ message: "User not found." });
-      return;
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey) {
+      return res.status(401).json({ message: "Missing Config" });
     }
 
-    const response = await axios.post(`${user.redmineUrl}/issues.json`, {
+    const response = await axios.post(`${account.redmineUrl}/issues.json`, {
       issue: {
         project_id: projectId,
         parent_issue_id: parentId,
@@ -358,7 +376,7 @@ export const createSubTask = async (req: any, res: Response) => {
         assigned_to_id: 'me' // Auto-assign to yourself
       }
     }, {
-      headers: { 'X-Redmine-API-Key': user.redmineApiKey }
+      headers: { 'X-Redmine-API-Key': account.redmineApiKey }
     });
 
     res.json({ success: true, issue: response.data.issue });
@@ -378,9 +396,8 @@ export const getTaskTrackers = (req: any, res: Response) => {
 
 export const getTaskParents = async (req: any, res: Response) => {
   try {
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-
-    if (!user || !user.watchedProjectIds || user.watchedProjectIds.length === 0) {
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.watchedProjectIds || account.watchedProjectIds.length === 0) {
       return res.json({ issues: [] });
     }
 
@@ -388,15 +405,15 @@ export const getTaskParents = async (req: any, res: Response) => {
     const today = new Date().toISOString().split('T')[0];
 
     // 1. Lấy danh sách các task cha từ các project đang theo dõi
-    const scanPromises = user.watchedProjectIds.map((projectId) =>
-      axios.get(`${user.redmineUrl}/issues.json`, {
+    const scanPromises = account.watchedProjectIds.map((projectId) =>
+      axios.get(`${account.redmineUrl}/issues.json`, {
         params: {
           project_id: projectId,
           parent_id: "!*",
           status_id: "open",
           limit: 20,
         },
-        headers: { "X-Redmine-API-Key": user.redmineApiKey },
+        headers: { "X-Redmine-API-Key": account.redmineApiKey },
       })
     );
 
@@ -406,10 +423,10 @@ export const getTaskParents = async (req: any, res: Response) => {
     const issuesWithLogCheck = await Promise.all(
       allIssues.map(async (issue: any) => {
         const loggedHours = await getTotalLoggedHours(
-          user.redmineUrl,
+          account.redmineUrl,
           issue.id,
           today,
-          user.redmineApiKey
+          account.redmineApiKey
         );
 
         return {
@@ -436,13 +453,13 @@ export const getTaskParents = async (req: any, res: Response) => {
 
 export const getListProjects = async (req: any, res: Response) => {
   try {
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user || !user.redmineApiKey || !user.redmineUrl) {
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey || !account.redmineUrl) {
       return res.status(400).json({ message: "Missing Redmine Configuration" });
     }
 
-    const response = await axios.get(`${user.redmineUrl}/projects.json`, {
-      headers: { 'X-Redmine-API-Key': user.redmineApiKey },
+    const response = await axios.get(`${account.redmineUrl}/projects.json`, {
+      headers: { 'X-Redmine-API-Key': account.redmineApiKey },
       params: {
         status: REDMINE_PROJECT_STATUS.ACTIVE,
         limit: 1000,
@@ -453,36 +470,55 @@ export const getListProjects = async (req: any, res: Response) => {
     res.json(response.data);
   } catch (error: any) {
     console.error("Redmine Proxy Error:", error.message);
-    res.status(500).json({ message: "Không thể kết nối tới Redmine" });
+    res.status(500).json({ message: "Cannot connect to Redmine" });
   }
 }
 
 export const getUserInfo = async (req: any, res: Response) => {
   try {
     const user = await AuthorizedUser.findOne({ email: req.user.email });
-    res.json(user);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const account = await RedmineAccount.findOne({ userId: user._id });
+
+    res.json({
+      email: user.email,
+      role: user.role,
+      redmineProfile: account?.redmineUserId ? {
+        id: account.redmineUserId,
+        login: account.login,
+        firstname: account.firstname,
+        lastname: account.lastname,
+        fullName: `${account.lastname || ''} ${account.firstname || ''}`.trim(),
+        admin: account.admin,
+        redmineUrl: account?.redmineUrl || "",
+        redmineApiKey: account?.redmineApiKey || "",
+        watchedProjectIds: account?.watchedProjectIds || [],
+        namingTemplate: account?.namingTemplate || "",
+      } : null
+    });
   } catch (error) {
-    res.status(500).json({ message: "Lỗi lấy thông tin user" });
+    res.status(500).json({ message: "Failed to get user info." });
   }
 }
 
 export const getRedmineConfig = async (req: any, res: Response) => {
   try {
-    const { redmineApiKey, redmineUrl, watchedProjectIds, namingTemplate } = req.body;
-    const email = req.user.email;
+    const { watchedProjectIds, namingTemplate } = req.body;
+    const user = await AuthorizedUser.findOne({ email: req.user.email });
 
-    const updatedUser = await AuthorizedUser.findOneAndUpdate(
-      { email },
-      {
-        redmineApiKey,
-        redmineUrl,
-        watchedProjectIds,
-        namingTemplate
-      },
-      { new: true, upsert: true }
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Lưu vào RedmineAccount
+    const account = await RedmineAccount.findOneAndUpdate(
+      { userId: user._id },
+      { watchedProjectIds, namingTemplate },
+      { new: true }
     );
 
-    res.json({ message: "Configuration updated successfully", data: updatedUser });
+    res.json({ message: "Configuration updated successfully", data: account });
   } catch (error) {
     console.error("Redmine Config Error:", error);
     res.status(500).json({ message: "Failed to save configuration" });
@@ -491,16 +527,16 @@ export const getRedmineConfig = async (req: any, res: Response) => {
 
 export const getProjectTaskTree = async (req: any, res: Response) => {
   try {
-    const user = await AuthorizedUser.findOne({ email: req.user.email });
-    if (!user || !user.redmineApiKey || !user.redmineUrl) {
+    const account = await getRedmineAccount(req.user.email);
+    if (!account || !account.redmineApiKey || !account.redmineUrl) {
       return res.status(400).json({ message: "Missing Redmine Configuration" });
     }
 
     const { projectName, taskName, taskDate } = req.query;
 
     // 1. Lấy TẤT CẢ Project (giới hạn 1000 là mức tối đa của Redmine API)
-    const projectsRes = await axios.get(`${user.redmineUrl}/projects.json`, {
-      headers: { 'X-Redmine-API-Key': user.redmineApiKey },
+    const projectsRes = await axios.get(`${account.redmineUrl}/projects.json`, {
+      headers: { 'X-Redmine-API-Key': account.redmineApiKey },
       params: { status: REDMINE_PROJECT_STATUS.ACTIVE, limit: 1000 }
     });
 
@@ -511,8 +547,8 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
     const taskParams: any = { assigned_to_id: "me", status_id: "*", limit: 1000 };
     if (taskDate) taskParams.created_on = taskDate;
 
-    const tasksRes = await axios.get(`${user.redmineUrl}/issues.json`, {
-      headers: { 'X-Redmine-API-Key': user.redmineApiKey },
+    const tasksRes = await axios.get(`${account.redmineUrl}/issues.json`, {
+      headers: { 'X-Redmine-API-Key': account.redmineApiKey },
       params: taskParams
     });
 
@@ -594,47 +630,67 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
 
   } catch (error: any) {
     console.error("Tree Data Error:", error.message);
-    res.status(500).json({ message: "Không thể lấy cấu trúc cây dữ liệu" });
+    res.status(500).json({ message: "Failed to get projects tasks" });
   }
 };
 
 export const setupRedmineAccount = async (req: any, res: Response) => {
   try {
-    const { username, password, redmineUrl } = req.body;
+    const { username, password, redmineUrl: rawRedmineUrl } = req.body;
+    const redmineUrl = normalizeUrl(rawRedmineUrl);
+
     const user = await AuthorizedUser.findOne({ email: req.user.email });
+
     if (!user || !username || !password || !redmineUrl) {
       return res.status(400).json({ message: "Please enter Company Redmine URL, Username, and Password for Redmine." });
     }
 
     let fetchedApiKey = "";
+    let redmineUserData: any = null;
+
     try {
-      // Gọi API mặc định của Redmine để lấy thông tin user hiện tại
       const currentUserRes = await axios.get(`${redmineUrl}/users/current.json`, {
-        auth: {
-          username: username,
-          password: password
-        }
+        auth: { username: username, password: password }
       });
-      // Lấy API Key từ response
-      fetchedApiKey = currentUserRes.data?.user?.api_key || "";
+      redmineUserData = currentUserRes.data?.user;
+      fetchedApiKey = redmineUserData?.api_key || "";
     } catch (apiErr: any) { }
 
     const encryptedPassword = CryptoJS.AES.encrypt(password, ENCRYPT_SECRET).toString();
 
-    let account = await RedmineAccount.findOne({ userId: user.id });
-    if (!account) {
-      account = new RedmineAccount({ userId: user.id, redmineUrl, username, password: encryptedPassword });
-    } else {
-      account.username = username;
-      account.password = encryptedPassword;
-      account.redmineUrl = redmineUrl;
+    const accountDataToSave: any = {
+      username,
+      password: encryptedPassword,
+      redmineUrl,
+    };
+
+    if (redmineUserData) {
+      accountDataToSave.redmineApiKey = fetchedApiKey;
+      accountDataToSave.redmineUserId = redmineUserData.id;
+      accountDataToSave.login = redmineUserData.login;
+      accountDataToSave.admin = redmineUserData.admin;
+      accountDataToSave.firstname = redmineUserData.firstname;
+      accountDataToSave.lastname = redmineUserData.lastname;
+      accountDataToSave.createdOn = redmineUserData.created_on;
+      accountDataToSave.updatedOn = redmineUserData.updated_on;
+      accountDataToSave.lastLoginOn = redmineUserData.last_login_on;
+      accountDataToSave.passwdChangedOn = redmineUserData.passwd_changed_on;
+      accountDataToSave.twofaScheme = redmineUserData.twofa_scheme;
+      accountDataToSave.customFields = redmineUserData.custom_fields;
     }
 
-    user.redmineUrl = redmineUrl;
-    if (fetchedApiKey) {
-      user.redmineApiKey = fetchedApiKey;
+    let account = await RedmineAccount.findOne({ userId: user._id });
+
+    if (!account) {
+      account = new RedmineAccount({
+        userId: user._id,
+        ...accountDataToSave
+      });
+    } else {
+      Object.assign(account, accountDataToSave);
     }
-    await user.save();
+
+    await account.save();
 
     try {
       await performRedmineLogin(account);
@@ -647,6 +703,7 @@ export const setupRedmineAccount = async (req: any, res: Response) => {
     }
 
   } catch (error: any) {
+    console.error("Setup Redmine Account Error:", error.message);
     res.status(500).json({ message: "Config Redmine failed. Please try again later." });
   }
 };
