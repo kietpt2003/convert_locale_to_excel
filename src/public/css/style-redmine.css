@@ -1024,3 +1024,103 @@ select.form-control[size] {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+
+/* Style cho thẻ Nháp */
+.draft-item {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #3b82f6; /* Viền xanh bên trái cho đẹp */
+  border-radius: 6px;
+  padding: 10px;
+  cursor: grab; /* Biểu tượng bàn tay */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.draft-item:active {
+  cursor: grabbing;
+}
+
+/* Hiệu ứng khi thẻ đang được kéo lên không trung */
+.draft-item.dragging {
+  opacity: 0.5;
+  border: 1px dashed #3b82f6;
+  transform: scale(0.98);
+}
+
+.draft-item .draft-title {
+  font-weight: 600;
+  color: #1e293b;
+  font-size: 0.85rem;
+  margin-bottom: 3px;
+}
+.draft-item .draft-meta {
+  color: #64748b;
+  font-size: 0.75rem;
+}
+
+.btn-del-draft {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 18px;
+  cursor: pointer;
+  opacity: 0.5;
+}
+.btn-del-draft:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Hiệu ứng Đích đến (Drop Zone) khi rê thẻ nháp vào Task cha */
+.tree-node.drag-over {
+  background-color: #eff6ff !important;
+  border: 2px dashed #3b82f6 !important;
+}
+
+/* =========================================
+   GLOBAL LOADING OVERLAY
+========================================= */
+#global-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.6); /* Nền đen mờ 60% */
+  display: none; /* Mặc định ẩn */
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  z-index: 9999; /* Luôn nổi lên trên cùng mọi thứ */
+  backdrop-filter: blur(3px); /* Hiệu ứng làm mờ nền hiện đại */
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #e2e8f0;
+  border-top: 5px solid #3b82f6; /* Màu xanh biển */
+  border-radius: 50%;
+  animation: spin 1s linear infinite; /* Xoay liên tục */
+  margin-bottom: 15px;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+#global-loading-text {
+  color: #ffffff;
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}

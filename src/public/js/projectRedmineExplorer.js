@@ -15,7 +15,7 @@ export async function openQuickLogTime(task) {
   modal.dataset.taskId = task.id; // Lưu ID vào dataset để dùng khi submit
 
   // 2. Set ngày mặc định là hôm nay (theo định dạng YYYY-MM-DD)
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date().toLocaleDateString("en-CA");
   dateInput.value = today;
 
   // 3. Load activities (Tái sử dụng logic cũ nhưng đổi target select)

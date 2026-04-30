@@ -23,8 +23,9 @@ import {
   getSpentTimeReport,
   getSpentTimeReportFilters,
   getRemoteFilterOptions,
-  generateSpentTimeReport
+  generateSpentTimeReport,
 } from '../controllers/redmine.controller.js';
+import { createDraft, deleteDraft, executeDraftMatch, getDrafts } from '../controllers/draft.controller.js';
 
 const router = Router();
 
@@ -51,5 +52,9 @@ router.get('/report/spent-time', redmineInterceptor, getSpentTimeReport);
 router.get('/report-filters', redmineInterceptor, getSpentTimeReportFilters);
 router.get('/report-filters/remote/:filter_name', redmineInterceptor, getRemoteFilterOptions);
 router.get('/generate-report', redmineInterceptor, generateSpentTimeReport);
+router.get('/drafts', getDrafts);
+router.post('/drafts', createDraft);
+router.delete('/drafts/:id', deleteDraft);
+router.post('/drafts/execute', redmineInterceptor, executeDraftMatch);
 
 export default router;

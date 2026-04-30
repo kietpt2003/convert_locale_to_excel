@@ -38,6 +38,109 @@
       <div class="dashboard-grid">
         <aside>
           <div class="card">
+            <div
+              class="card-header"
+              style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+              "
+            >
+              <h3 style="margin: 0; font-size: 1rem; color: #1e293b">
+                📝 Quick Drafts
+              </h3>
+              <span
+                id="draftCount"
+                style="
+                  background: #e2e8f0;
+                  color: #475569;
+                  padding: 2px 8px;
+                  border-radius: 12px;
+                  font-size: 0.8rem;
+                  font-weight: bold;
+                "
+                >0</span
+              >
+            </div>
+
+            <div class="card-body" style="padding: 15px">
+              <div
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                  margin-bottom: 15px;
+                  border-bottom: 1px dashed #cbd5e0;
+                  padding-bottom: 15px;
+                "
+              >
+                <input
+                  type="text"
+                  id="draftSubject"
+                  placeholder="Nội dung công việc (vd: Fix bug login...)"
+                  class="form-control"
+                  style="margin: 0"
+                />
+
+                <select
+                  id="draftActivity"
+                  class="form-control"
+                  style="margin: 0"
+                >
+                  <option value="">-- Chọn Activity --</option>
+                </select>
+
+                <div style="display: flex; gap: 5px">
+                  <input
+                    type="number"
+                    id="draftHours"
+                    placeholder="Giờ"
+                    step="0.5"
+                    min="0.5"
+                    class="form-control"
+                    style="width: 70px; margin: 0"
+                  />
+                  <input
+                    type="date"
+                    id="draftDate"
+                    class="form-control"
+                    style="flex: 1; margin: 0"
+                  />
+                  <button
+                    id="btnAddDraft"
+                    class="btn-confirm"
+                    style="margin: 0; padding: 6px 12px; font-size: 0.85rem"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              <div
+                id="draftListContainer"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 8px;
+                  max-height: 350px;
+                  overflow-y: auto;
+                "
+              >
+                <div
+                  style="
+                    text-align: center;
+                    color: #94a3b8;
+                    font-size: 0.85rem;
+                    padding: 10px;
+                  "
+                >
+                  Chưa có bản nháp nào
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 20px">
             <div class="card-header">
               <h3>⚙️ Preferences</h3>
             </div>
@@ -196,8 +299,69 @@
 
           <div id="explorer-tab" class="tab-content">
             <div class="card">
-              <div class="card-header flex-header">
-                <h3>🌳 Project & Task Hierarchy</h3>
+              <div
+                class="card-header flex-header"
+                style="
+                  display: flex;
+                  justify-content: space-between;
+                  align-items: center;
+                "
+              >
+                <h3 style="margin: 0">🌳 Project & Task Hierarchy</h3>
+                <button
+                  id="btnReloadTree"
+                  style="
+                    background: none;
+                    border: 1px solid #cbd5e0;
+                    padding: 4px 10px;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    color: #3b82f6;
+                    display: flex;
+                    align-items: center;
+                    gap: 5px;
+                    transition: all 0.2s;
+                  "
+                >
+                  <svg
+                    id="iconReloadTree"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke-width="2"
+                    stroke="currentColor"
+                    style="width: 16px; height: 16px"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                    />
+                  </svg>
+                  <span style="font-weight: 600; font-size: 0.85rem"
+                    >Refresh</span
+                  >
+                </button>
+              </div>
+
+              <div
+                style="
+                  font-size: 0.8rem;
+                  color: #dc2626;
+                  padding: 6px 15px;
+                  background-color: #fef2f2;
+                  border-bottom: 1px solid #fee2e2;
+                  display: flex;
+                  align-items: center;
+                  gap: 5px;
+                "
+              >
+                <span>⚠️</span>
+                <span
+                  >The data was last updated at
+                  <strong id="lastUpdatedTime">--:--:-- --/--/----</strong>.
+                  Please click Refresh to reload the latest data.</span
+                >
               </div>
               <div class="search-bar">
                 <input

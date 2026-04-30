@@ -5,6 +5,7 @@ import {
   initQuickSelectors,
 } from "./calendar.js";
 import { debounce } from "./debounce.js";
+import { initDraftWidget } from "./draftWidget.js";
 import {
   initQuickModalEvents,
   openQuickLogTime,
@@ -14,6 +15,7 @@ import { initSpentTimeReportTab } from "./tabSpentTimeReport.js";
 
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
+let globalProjectTreeData = null;
 
 // Use this function to navigate and remove token in admin-redmine
 export async function fetchWithAuth(url, options = {}) {
@@ -89,6 +91,21 @@ export async function initApp() {
     document.getElementById("redmineLoginOverlay").style.display = "none";
   });
 
+  //Event reload project explorer
+  document
+    .getElementById("btnReloadTree")
+    .addEventListener("click", async (e) => {
+      globalProjectTreeData = null;
+
+      // 3. Hiển thị trạng thái loading
+      const container = document.getElementById("projectTreeContainer");
+      container.innerHTML =
+        '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Fetch new data from Redmine...</div>';
+
+      // 4. Gọi lại hàm load gốc (Vì globalProjectTreeData đã null, nó sẽ tự động fetch API lại từ đầu)
+      await loadFullProjectTree();
+    });
+
   // Event SHOW/HIDE PASSWORD
   const togglePasswordBtn = document.getElementById("togglePasswordBtn");
   const passwordInput = document.getElementById("modalRedminePassword");
@@ -127,6 +144,7 @@ export async function initApp() {
 
   initQuickSelectors();
   initQuickModalEvents();
+  initDraftWidget();
 
   document.getElementById("prevMonth").onclick = () => changeMonth(-1);
   document.getElementById("nextMonth").onclick = () => changeMonth(1);
@@ -535,6 +553,82 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
       openQuickLogTime(task);
     });
 
+    treeRow.ondragover = (e) => {
+      e.preventDefault(); // BẮT BUỘC: Cho phép thẻ div nhận phần tử thả vào
+      treeRow.classList.add("drag-over"); // Thêm class để CSS đổi màu nền sáng lên
+    };
+
+    // 2. Khi kéo lướt ra khỏi Task này (không thả)
+    treeRow.ondragleave = () => {
+      treeRow.classList.remove("drag-over"); // Tắt màu nền
+    };
+
+    // 3. Khi chính thức THẢ CHUỘT vào Task này
+    treeRow.ondrop = async (e) => {
+      e.preventDefault();
+      treeRow.classList.remove("drag-over");
+
+      const dragDataString = e.dataTransfer.getData("application/json");
+      if (!dragDataString) return;
+
+      const draftData = JSON.parse(dragDataString);
+      const parentTaskId = task.id;
+      const projectId = task.project ? task.project.id : null;
+
+      if (
+        confirm(
+          `🤖 AUTO-MATION: \n\n1. Tạo Task con: "${draftData.subject}"\n2. Log ${draftData.hours}h vào Task #${parentTaskId} ngày ${draftData.spentOn}\n\nThực thi ngay?`,
+        )
+      ) {
+        try {
+          showLoadingOverlay("Hệ thống đang tự động tạo Task và Log time...");
+
+          const res = await fetchWithAuth("/api/redmine/drafts/execute", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              draftId: draftData._id,
+              // parentTaskId: parentTaskId,
+              parentTaskId: 8292,
+              projectId: projectId,
+              // activityId: 9 // Mở comment này nếu Redmine của bạn BẮT BUỘC có Activity ID
+            }),
+          });
+
+          const result = await res.json();
+
+          if (result.success) {
+            alert(
+              `🎉 ${result.message}\nTask ID mới sinh ra: #${result.data.newTaskId}`,
+            );
+
+            // Xóa thẻ nháp khỏi giao diện ngay lập tức cho mượt
+            const draftEl = document.querySelector(
+              `.draft-item .btn-del-draft[data-id="${draftData._id}"]`,
+            );
+            if (draftEl) draftEl.closest(".draft-item").remove();
+
+            // 2. XÓA CACHE CŨ
+            globalProjectTreeData = null;
+
+            // 3. Hiển thị trạng thái loading
+            const container = document.getElementById("projectTreeContainer");
+            container.innerHTML =
+              '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Đang lấy dữ liệu mới nhất từ Redmine...</div>';
+
+            // 4. Gọi lại hàm load gốc (Vì globalProjectTreeData đã null, nó sẽ tự động fetch API lại từ đầu)
+            await loadFullProjectTree();
+          } else {
+            alert(`❌ Lỗi: ${result.message}`);
+          }
+        } catch (error) {
+          alert("Lỗi mạng hoặc máy chủ không phản hồi.");
+        } finally {
+          hideLoadingOverlay();
+        }
+      }
+    };
+
     if (hasChildren) {
       renderTaskNodes(task.subtasks, li.querySelector(".sub-tree"), tQuery);
     }
@@ -542,51 +636,140 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
   });
 }
 
-// Cập nhật hàm loadFullProjectTree để truyền query vào
 async function loadFullProjectTree() {
-  const pName = document.getElementById("treeSearchProject").value;
-  const tName = document.getElementById("treeSearchTask").value;
-
   const container = document.getElementById("projectTreeContainer");
-  // Không nên clear toàn bộ innerHTML liên tục khi gõ để tránh giật lag,
-  // nhưng ở đây ta làm đơn giản để đảm bảo highlight mới nhất.
-  container.style.opacity = "0.5";
 
-  try {
-    const response = await fetchWithAuth(
-      `/api/redmine/projects/tasks?projectName=${pName}&taskName=${tName}`,
-    );
-    const data = await response.json();
+  // 1. CHỈ GỌI API NẾU CHƯA CÓ DỮ LIỆU GỐC
+  if (!globalProjectTreeData) {
+    container.style.opacity = "0.5";
+    try {
+      const iconSvg = document.getElementById("iconReloadTree");
+      if (iconSvg) iconSvg.style.animation = "spin 1s linear infinite";
 
-    container.innerHTML = "";
-    container.style.opacity = "1";
+      // Gọi API lấy toàn bộ dữ liệu (Không truyền tham số search)
+      const response = await fetchWithAuth(`/api/redmine/projects/tasks`);
+      globalProjectTreeData = await response.json();
 
-    if (!data || data.length === 0) {
-      container.innerHTML = '<div class="empty-state">No data found</div>';
+      const now = new Date();
+      const timeString = now.toLocaleString("vi-VN", {
+        hour12: false,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      document.getElementById("lastUpdatedTime").innerText = timeString;
+
+      if (iconSvg) iconSvg.style.animation = "none";
+    } catch (error) {
+      if (iconSvg) iconSvg.style.animation = "none";
+      container.innerHTML = '<div class="error-state">Error loading data</div>';
       return;
     }
-
-    const rootList = document.createElement("ul");
-    rootList.className = "tree-root";
-
-    // Truyền thêm pName và tName xuống để highlight
-    renderProjectNodes(data, rootList, pName, tName);
-
-    if (pName || tName) {
-      const allItems = rootList.querySelectorAll(".tree-item");
-      allItems.forEach((item) => item.classList.add("open"));
-    }
-
-    container.appendChild(rootList);
-  } catch (error) {
-    console.log("check errr", error);
-
-    container.innerHTML = '<div class="error-state">Error loading data</div>';
   }
+
+  // 2. CHẠY HÀM LỌC LOCAL
+  executeLocalSearch();
+}
+
+function executeLocalSearch() {
+  if (!globalProjectTreeData) return;
+
+  const pName = document
+    .getElementById("treeSearchProject")
+    .value.toLowerCase();
+  const tName = document.getElementById("treeSearchTask").value.toLowerCase();
+  const container = document.getElementById("projectTreeContainer");
+
+  container.style.opacity = "0.5";
+
+  // --- THUẬT TOÁN ĐỆ QUY LỌC TASK ---
+  function filterTasks(tasks) {
+    if (!tName) return tasks; // Không search task thì giữ nguyên
+    return tasks.reduce((acc, task) => {
+      const matchSelf =
+        task.subject.toLowerCase().includes(tName) ||
+        task.id.toString().includes(tName);
+      const filteredSubtasks = filterTasks(task.subtasks || []); // Đệ quy task con
+
+      // Giữ task nếu nó khớp, HOẶC có task con khớp
+      if (matchSelf || filteredSubtasks.length > 0) {
+        acc.push({ ...task, subtasks: filteredSubtasks });
+      }
+      return acc;
+    }, []);
+  }
+
+  // --- THUẬT TOÁN ĐỆ QUY LỌC PROJECT ---
+  function filterProjects(projects) {
+    return projects.reduce((acc, p) => {
+      const filteredTasks = filterTasks(p.tasks || []);
+      const filteredSubProjects = filterProjects(p.subProjects || []);
+
+      const matchPName =
+        !pName ||
+        p.name.toLowerCase().includes(pName) ||
+        p.id.toString().includes(pName);
+      const hasTasks = filteredTasks.length > 0;
+      const hasSubProjects = filteredSubProjects.length > 0;
+
+      let keep = false;
+      if (pName && tName) {
+        // Search cả 2: Phải khớp Project VÀ có Task bên trong (hoặc có Project con khớp)
+        keep = hasSubProjects || (matchPName && hasTasks);
+      } else if (pName) {
+        // Chỉ search Project
+        keep = matchPName || hasSubProjects;
+      } else if (tName) {
+        // Chỉ search Task
+        keep = hasTasks || hasSubProjects;
+      } else {
+        // Không search gì
+        keep = true;
+      }
+
+      if (keep) {
+        acc.push({
+          ...p,
+          tasks: filteredTasks,
+          subProjects: filteredSubProjects,
+        });
+      }
+      return acc;
+    }, []);
+  }
+
+  // 3. APPLY LỌC VÀO DỮ LIỆU GỐC
+  const filteredData = filterProjects(globalProjectTreeData);
+
+  // 4. RENDER LẠI GIAO DIỆN
+  container.innerHTML = "";
+  container.style.opacity = "1";
+
+  if (filteredData.length === 0) {
+    container.innerHTML =
+      '<div class="empty-state" style="padding:15px;text-align:center;color:#64748b;">No matching data found</div>';
+    return;
+  }
+
+  const rootList = document.createElement("ul");
+  rootList.className = "tree-root";
+
+  renderProjectNodes(filteredData, rootList, pName, tName);
+
+  // Mở rộng cây nếu có search
+  if (pName || tName) {
+    const allItems = rootList.querySelectorAll(".tree-item");
+    allItems.forEach((item) => item.classList.add("open"));
+  }
+
+  container.appendChild(rootList);
 }
 
 const debouncedLoadTree = debounce(() => {
-  loadFullProjectTree();
+  executeLocalSearch();
 }, 1000);
 
 // ==========================================
@@ -673,3 +856,29 @@ document
 document
   .getElementById("treeSearchTask")
   .addEventListener("input", debouncedLoadTree);
+
+export function showLoadingOverlay(message = "Đang xử lý, vui lòng đợi...") {
+  let overlay = document.getElementById("global-loading-overlay");
+
+  // Nếu DOM chưa có khối này thì tự động tạo ra và gắn vào Body
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "global-loading-overlay";
+    overlay.innerHTML = `
+      <div class="loading-spinner"></div>
+      <div id="global-loading-text"></div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  // Cập nhật câu thông báo và bật hiển thị bằng Flex
+  document.getElementById("global-loading-text").innerText = message;
+  overlay.style.display = "flex";
+}
+
+export function hideLoadingOverlay() {
+  const overlay = document.getElementById("global-loading-overlay");
+  if (overlay) {
+    overlay.style.display = "none";
+  }
+}
