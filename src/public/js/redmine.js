@@ -111,14 +111,17 @@ export async function loadUserData() {
     const user = await res.json();
 
     if (user) {
-      document.getElementById("modalRedmineUrl").value = user.redmineUrl || "";
+      document.getElementById("modalRedmineUrl").value =
+        user?.redmineProfile?.redmineUrl || "";
       document.getElementById("format").value =
-        user.namingTemplate || "[PROJECT] | [PARENT] | Working";
+        user?.redmineProfile?.namingTemplate ||
+        "[PROJECT] | [PARENT] | Working";
 
       const userDisplay = document.getElementById("user-display");
-      if (userDisplay) userDisplay.innerText = user.email;
+      if (userDisplay)
+        userDisplay.innerText = user?.redmineProfile?.login || "";
 
-      if (!user.redmineUrl) {
+      if (!user?.redmineProfile?.redmineUrl) {
         showRedmineLoginModal(
           "Welcome! You need to log in to Redmine to start using the tool.",
         );
@@ -127,7 +130,7 @@ export async function loadUserData() {
 
       // Cố gắng gọi API lấy project. Nếu session chết hoặc chưa cấu hình,
       // fetchWithAuth sẽ tự động quăng lỗi và bật Modal!
-      await fetchRedmineProjects(user.watchedProjectIds || []);
+      await fetchRedmineProjects(user?.redmineProfile?.watchedProjectIds || []);
     }
   } catch (err) {
     console.error("Failed to load user data:", err);
@@ -562,7 +565,8 @@ async function handleRedmineLogin() {
   const btnSubmit = document.getElementById("btnSubmitRedmineLogin");
 
   if (!urlParams || !usernameParams || !passwordParams) {
-    errEl.innerText = "Vui lòng nhập đầy đủ URL, Username và Password.";
+    errEl.innerText =
+      "Please enter the full Redmine URL, Username, and Password.";
     errEl.style.display = "block";
     return;
   }
