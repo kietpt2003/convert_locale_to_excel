@@ -141,7 +141,7 @@ export const getTasks = async (req: any, res: Response) => {
       });
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
 
     const tasksWithDetails = await Promise.all(
       combinedIssues.map(async (issue: any) => {
@@ -297,8 +297,11 @@ export const getMonthlyHours = async (req: any, res: Response) => {
     }
 
     // Calculate start date and end date of month
-    const fromDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const toDate = new Date(Number(year), Number(month), 0).toISOString().split('T')[0];
+    const paddedMonth = String(month).padStart(2, '0');
+    const fromDate = `${year}-${paddedMonth}-01`;
+
+    const lastDayOfMonth = new Date(Number(year), Number(month), 0).getDate();
+    const toDate = `${year}-${paddedMonth}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
     const timeEntriesRes = await axios.get(`${account.redmineUrl}/time_entries.json`, {
       params: { user_id: "me", from: fromDate, to: toDate, limit: 1000 },
@@ -312,7 +315,7 @@ export const getMonthlyHours = async (req: any, res: Response) => {
 
     if (issueIds.length > 0) {
       const issuesRes = await axios.get(`${account.redmineUrl}/issues.json`, {
-        params: { issue_id: issueIds.join(','), limit: 100 },
+        params: { issue_id: issueIds.join(','), limit: 1000 },
         headers: { "X-Redmine-API-Key": account.redmineApiKey }
       });
 
@@ -402,7 +405,7 @@ export const getTaskParents = async (req: any, res: Response) => {
     }
 
     // Lấy ngày hiện tại (định dạng YYYY-MM-DD)
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('en-CA');
 
     // 1. Lấy danh sách các task cha từ các project đang theo dõi
     const scanPromises = account.watchedProjectIds.map((projectId) =>
@@ -1265,5 +1268,205 @@ export const generateSpentTimeReport = async (req: any, res: any) => {
 
     console.error("Generate Report Error:", error.message);
     res.status(500).json({ message: "Lỗi khi trích xuất dữ liệu bảng báo cáo từ Redmine" });
+  }
+};
+
+export const getProjectTaskTreeV2 = async (req: any, res: any) => {
+  try {
+    const account = req.redmineAccount;
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Missing Redmine Configuration / Session" });
+    }
+
+    const { projectName, taskName, taskDate, onlyShowMyTasks } = req.query;
+    const isOnlyMyTasks = onlyShowMyTasks === 'true';
+
+    // =====================================================================
+    // BƯỚC 1: LẤY DANH SÁCH PROJECT TỪ API JSON
+    // Cực kỳ nhanh, trả về thẳng ID số và Parent ID số chuẩn xác!
+    // Vẫn gọi qua res.fetchRedmine để dùng Session Cookie
+    // =====================================================================
+    const projectsRes = await axios.get(`${account.redmineUrl}/projects.json`, {
+      headers: { 'X-Redmine-API-Key': account.redmineApiKey },
+      params: { status: REDMINE_PROJECT_STATUS.ACTIVE, limit: 1000 }
+    });
+
+    // MẸO: Nếu Redmine của bạn có nhiều hơn 100 project, API này cũng phân trang.
+    // Tạm thời mình dùng limit=100, nếu thiếu bạn có thể viết vòng lặp lấy hết giống lúc cào Task.
+    let allProjects = projectsRes.data.projects || [];
+    const allProjectIds = new Set(allProjects.map((p: any) => p.id));
+
+    // Tạo Map để lát cào HTML Task có thể dùng "Tên Project" tra ngược ra "ID Project"
+    const projectNameToIdMap = new Map();
+    allProjects.forEach((p: any) => projectNameToIdMap.set(p.name.trim(), p.id));
+
+    // =====================================================================
+    // BƯỚC 2: CÀO HTML TASK SONG SONG (CÓ PHÂN TRANG)
+    // =====================================================================
+    const globalTaskMap = new Map(); // Dùng Map để khử trùng lặp
+
+    const fetchTasksForProject = async (projectIdentifier: string) => {
+      let page = 1;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        // QUAN TRỌNG: Đã đổi limit=100 thành per_page=100 để cào nhanh hơn
+        const url = `${account.redmineUrl}/projects/${projectIdentifier}/issues?set_filter=1&sort=id:desc&c[]=project&c[]=parent&c[]=tracker&c[]=subject&c[]=status&c[]=priority&c[]=assigned_to&per_page=100&page=${page}`;
+
+        try {
+          const response = await res.fetchRedmine(url);
+          const $ = cheerio.load(response.data);
+          const rows = $('table.issues tbody tr');
+
+          if (rows.length === 0) break;
+
+          rows.each((i, el) => {
+            const $el = $(el);
+            const idText = $el.find('td.id a').text().trim();
+            if (!idText) return;
+
+            const id = parseInt(idText, 10);
+            const subject = $el.find('td.subject a').text().trim();
+            const status = $el.find('td.status').text().trim();
+
+            // LẤY PARENT ID BẰNG REGEX ĐỂ CHỐNG LỖI NaN
+            const parentText = $el.find('td.parent').text().trim();
+            const parentMatch = parentText.match(/\d+/);
+            const parentId = parentMatch ? parseInt(parentMatch[0], 10) : null;
+
+            const projNameHTML = $el.find('td.project').text().trim();
+            const projectId = projectNameToIdMap.get(projNameHTML) || null;
+
+            const isMine = $el.hasClass('assigned-to-me');
+
+            globalTaskMap.set(id, {
+              id,
+              subject,
+              status: { name: status },
+              parent: parentId ? { id: parentId } : null,
+              project: { id: projectId, name: projNameHTML, identifier: projectIdentifier },
+              isMine: isMine
+            });
+          });
+
+          // Nhận diện phân trang
+          hasNextPage = $('.next.page').length > 0 || $('.next').length > 0;
+          page++;
+        } catch (err) {
+          console.error(`Lỗi cào project ${projectIdentifier} page ${page}:`, err);
+          break;
+        }
+      }
+    };
+
+    // CHUNK PROCESSING: Cào 5 project cùng lúc
+    const chunkSize = 10;
+    for (let i = 0; i < allProjects.length; i += chunkSize) {
+      const chunk = allProjects.slice(i, i + chunkSize);
+      // Dùng identifier từ JSON để cào Task
+      await Promise.all(chunk.map((p: any) => fetchTasksForProject(p.identifier)));
+    }
+
+    let allTasks = Array.from(globalTaskMap.values());
+
+    // =====================================================================
+    // BƯỚC 3: LỌC "ONLY SHOW MY TASKS" (ĐỆ QUY NGƯỢC GIỮ LẠI TASK CHA)
+    // =====================================================================
+    if (isOnlyMyTasks) {
+      const keepTaskIds = new Set();
+
+      const markToKeep = (taskId: number) => {
+        if (keepTaskIds.has(taskId)) return;
+        keepTaskIds.add(taskId);
+
+        const task = globalTaskMap.get(taskId);
+        if (task && task.parent && task.parent.id) {
+          markToKeep(task.parent.id);
+        }
+      };
+
+      allTasks.forEach(t => {
+        if (t.isMine) markToKeep(t.id);
+      });
+
+      allTasks = allTasks.filter(t => keepTaskIds.has(t.id));
+    }
+
+    // =====================================================================
+    // BƯỚC 4: TÌM KIẾM THEO TÊN / ID TASK
+    // =====================================================================
+    if (taskName) {
+      const tSearch = String(taskName).toLowerCase();
+      allTasks = allTasks.filter((t: any) =>
+        t.subject.toLowerCase().includes(tSearch) || t.id.toString().includes(tSearch)
+      );
+    }
+
+    // =====================================================================
+    // BƯỚC 5: XÂY CÂY PROJECT & TASK TỪ MẢNG PHẲNG JSON
+    // =====================================================================
+    const buildTaskTree = (nodes: any[], parentId: number | null, allIdsInProject: Set<any>): any[] => {
+      return nodes
+        .filter((t: any) => {
+          const pId = t.parent ? t.parent.id : null;
+          return parentId === null
+            ? (!t.parent || !allIdsInProject.has(t.parent.id))
+            : (pId === parentId);
+        })
+        .map((t: any) => ({
+          ...t,
+          subtasks: buildTaskTree(nodes, t.id, allIdsInProject)
+        }));
+    };
+
+    // Hàm đệ quy này giờ sẽ dùng p.id và p.parent.id (là số) lấy từ JSON
+    const buildProjectTree = (parentId: number | null): any[] => {
+      return allProjects
+        .filter((p: any) => {
+          const pId = p.parent ? p.parent.id : null;
+          return parentId === null
+            ? (!p.parent || !allProjectIds.has(p.parent.id))
+            : (pId === parentId);
+        })
+        .map((project: any) => {
+          // Map Task vào Project bằng ID số
+          const projectTasks = allTasks.filter((t: any) => t.project.id === project.id);
+          const projectTaskIds = new Set(projectTasks.map((t: any) => t.id));
+
+          return {
+            id: project.id,
+            name: project.name,
+            identifier: project.identifier,
+            tasks: buildTaskTree(projectTasks, null, projectTaskIds),
+            subProjects: buildProjectTree(project.id)
+          };
+        });
+    };
+
+    let projectTree = buildProjectTree(null);
+
+    // Lọc đệ quy cây Project rỗng 
+    if (projectName || isOnlyMyTasks || taskName) {
+      const pSearch = projectName ? String(projectName).toLowerCase() : "";
+      const filterProjectRecursive = (list: any[]): any[] => {
+        return list
+          .map(p => ({ ...p, subProjects: filterProjectRecursive(p.subProjects) }))
+          .filter(p => {
+            const matchesName = p.name.toLowerCase().includes(pSearch);
+            const matchesId = p.id.toString().includes(pSearch);
+            const hasTasks = p.tasks && p.tasks.length > 0;
+            const hasMatchingChildren = p.subProjects && p.subProjects.length > 0;
+
+            return (projectName && (matchesName || matchesId)) || hasMatchingChildren || hasTasks;
+          });
+      };
+      projectTree = filterProjectRecursive(projectTree);
+    }
+
+    res.json(projectTree);
+
+  } catch (error: any) {
+    console.error("Scraping Tree Data Error:", error.message);
+    res.status(500).json({ message: "Failed to scrape projects/tasks HTML" });
   }
 };
