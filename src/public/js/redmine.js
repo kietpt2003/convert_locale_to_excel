@@ -10,6 +10,7 @@ import {
   openQuickLogTime,
 } from "./projectRedmineExplorer.js";
 import { initCreateTaskTab } from "./tabCreateTask.js";
+import { initSpentTimeReportTab } from "./tabSpentTimeReport.js";
 
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
@@ -417,13 +418,20 @@ window.openTab = function (evt, tabName) {
     evt.currentTarget.classList.add("active");
   }
 
-  // 4. Nếu là tab Explorer thì load dữ liệu
-  if (tabName === "explorer-tab") {
-    loadFullProjectTree();
-  }
+  switch (tabName) {
+    case "explorer-tab":
+      loadFullProjectTree();
+      break;
 
-  if (tabName === "tabCreateTask") {
-    initCreateTaskTab();
+    case "tabCreateTask":
+      initCreateTaskTab();
+      break;
+
+    case "tabSpentTimeReport":
+      initSpentTimeReportTab();
+      break;
+    default:
+      break;
   }
 };
 

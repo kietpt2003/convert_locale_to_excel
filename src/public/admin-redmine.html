@@ -94,6 +94,12 @@
             <button class="tab-btn" onclick="openTab(event, 'tabCreateTask')">
               🆕 Task Creation
             </button>
+            <button
+              class="tab-btn"
+              onclick="openTab(event, 'tabSpentTimeReport')"
+            >
+              📊 Spent Time Report
+            </button>
           </div>
 
           <div id="approval-tab" class="tab-content active">
@@ -212,8 +218,10 @@
           </div>
 
           <div id="tabCreateTask" class="tab-content">
-            <div class="create-task-container">
-              <h3>🆕 Create New Task / Sub-task</h3>
+            <div class="create-task-container card">
+              <div class="card-header">
+                <h3>🆕 Create New Task / Sub-task</h3>
+              </div>
 
               <div class="form-group explorer-style">
                 <label>Target Project <span class="required">*</span></label>
@@ -244,7 +252,9 @@
                 <input type="hidden" id="tabParentTaskSelect" />
               </div>
 
-              <hr />
+              <hr
+                style="margin: 20px 0; border: 0; border-top: 1px solid #eee"
+              />
 
               <div class="form-group">
                 <label>Task Subject <span class="required">*</span></label>
@@ -324,12 +334,156 @@
 
               <button
                 id="btnConfirmTabCreate"
-                class="btn-primary"
+                class="btn-save"
                 style="margin-top: 15px; width: 100%"
                 disabled
               >
                 Create Task
               </button>
+            </div>
+          </div>
+
+          <div id="tabSpentTimeReport" class="tab-content">
+            <div class="card">
+              <div class="card-header">
+                <h3>📊 Spent Time Report</h3>
+              </div>
+
+              <div class="report-filters">
+                <fieldset
+                  style="
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    background: #f8fafc;
+                  "
+                >
+                  <legend
+                    style="
+                      color: #475569;
+                      font-weight: 600;
+                      padding: 0 5px;
+                      font-size: 0.95rem;
+                    "
+                  >
+                    🔍 Filters
+                  </legend>
+
+                  <div
+                    id="activeFiltersContainer"
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: 10px;
+                      margin-bottom: 15px;
+                    "
+                  ></div>
+
+                  <div
+                    style="
+                      display: flex;
+                      align-items: center;
+                      gap: 10px;
+                      border-top: 1px dashed #cbd5e0;
+                      padding-top: 15px;
+                    "
+                  >
+                    <label
+                      style="
+                        margin: 0;
+                        font-size: 0.85rem;
+                        color: #64748b;
+                        font-weight: bold;
+                      "
+                      >Add filter:</label
+                    >
+                    <select
+                      id="addFilterSelect"
+                      class="form-control"
+                      style="
+                        width: auto;
+                        min-width: 200px;
+                        margin: 0;
+                        padding: 6px 10px;
+                      "
+                    >
+                      <option value="">-- Select filter --</option>
+                    </select>
+                  </div>
+                </fieldset>
+
+                <fieldset
+                  style="
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    padding: 15px;
+                  "
+                >
+                  <legend
+                    style="
+                      color: #475569;
+                      font-weight: 600;
+                      padding: 0 5px;
+                      font-size: 0.95rem;
+                    "
+                  >
+                    ⚙️ Options
+                  </legend>
+                  <div class="form-row" style="display: flex; gap: 15px">
+                    <div class="form-group" style="flex: 1">
+                      <label style="margin-top: 0">Columns (Details)</label>
+                      <select
+                        id="reportColumnsSelect"
+                        class="form-control"
+                        style="margin-bottom: 0"
+                      ></select>
+                    </div>
+                    <div class="form-group" style="flex: 1">
+                      <label style="margin-top: 0"
+                        >Group By (Add Criteria)</label
+                      >
+                      <select
+                        id="reportCriteriaSelect"
+                        class="form-control"
+                        style="margin-bottom: 0"
+                      >
+                        <option value="">-- None --</option>
+                      </select>
+                    </div>
+                  </div>
+                </fieldset>
+
+                <div style="display: flex; gap: 10px">
+                  <button
+                    id="btnGenerateReport"
+                    class="btn-confirm"
+                    style="margin-top: 20px; padding: 10px 20px"
+                  >
+                    Apply & Generate
+                  </button>
+                  <button
+                    id="btnClearFilters"
+                    class="btn-icon"
+                    style="margin-top: 20px; border: 1px solid #cbd5e0"
+                  >
+                    🔄 Clear
+                  </button>
+                </div>
+              </div>
+
+              <hr
+                style="margin: 25px 0; border: 0; border-top: 1px solid #eee"
+              />
+
+              <div id="reportResultContainer" style="display: none">
+                <div class="table-wrapper">
+                  <table id="reportResultTable">
+                    <thead id="reportResultHead"></thead>
+                    <tbody id="reportResultBody"></tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </main>

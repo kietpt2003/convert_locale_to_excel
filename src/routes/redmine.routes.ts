@@ -19,7 +19,11 @@ import {
   getProjectTaskTree,
   setupRedmineAccount,
   getUsersFromReportHTML,
-  getNewTaskOptions
+  getNewTaskOptions,
+  getSpentTimeReport,
+  getSpentTimeReportFilters,
+  getRemoteFilterOptions,
+  generateSpentTimeReport
 } from '../controllers/redmine.controller.js';
 
 const router = Router();
@@ -43,5 +47,9 @@ router.get('/projects/tasks', getProjectTaskTree);
 router.post('/login', setupRedmineAccount);
 router.get('/user/all', redmineInterceptor, getUsersFromReportHTML);
 router.get('/projects/:project_id/task-options', redmineInterceptor, getNewTaskOptions);
+router.get('/report/spent-time', redmineInterceptor, getSpentTimeReport);
+router.get('/report-filters', redmineInterceptor, getSpentTimeReportFilters);
+router.get('/report-filters/remote/:filter_name', redmineInterceptor, getRemoteFilterOptions);
+router.get('/generate-report', redmineInterceptor, generateSpentTimeReport);
 
 export default router;

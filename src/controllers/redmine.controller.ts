@@ -925,3 +925,345 @@ export const getNewTaskOptions = async (req: any, res: any) => {
     res.status(500).json({ message: "Lỗi khi lấy dữ liệu form tạo task" });
   }
 };
+
+export const getSpentTimeReport = async (req: any, res: any) => {
+  try {
+    const account = req.redmineAccount; // from middleware
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Please link your Redmine Account first." });
+    }
+
+    // 1. Build URL from query params
+    const {
+      columns, // 'day', 'week', 'month', 'year'
+      from,    // YYYY-MM-DD
+      to,      // YYYY-MM-DD
+      period, // 'w' (this week), 'lw' (last week), 'm' (this month), 'lm' (last month), 'y' (this year)
+      project_id,
+      user_id,
+      criteria = 'project' // 'project', 'user', 'issue', 'activity'
+    } = req.query;
+
+    const reportParams = new URLSearchParams();
+    reportParams.append('set_filter', '1');
+    reportParams.append('criteria[]', criteria);
+    reportParams.append('t[]', 'hours');
+
+    reportParams.append('columns', columns || 'day'); // Default to day
+
+    // Handle time filters
+    reportParams.append('f[]', 'spent_on');
+    if (from && to) {
+      reportParams.append('op[spent_on]', '><');
+      reportParams.append('v[spent_on][]', from);
+      reportParams.append('v[spent_on][]', to);
+    } else {
+      reportParams.append('op[spent_on]', period || 'm'); // Default to this month
+    }
+
+    // Handle other filters
+    if (project_id) {
+      reportParams.append('f[]', 'project_id');
+      reportParams.append('op[project_id]', '=');
+      reportParams.append('v[project_id][]', project_id);
+    }
+    if (user_id) {
+      reportParams.append('f[]', 'user_id');
+      reportParams.append('op[user_id]', '=');
+      reportParams.append('v[user_id][]', user_id);
+    }
+
+    const reportUrl = `${account.redmineUrl}/time_entries/report?${reportParams.toString()}`;
+
+    // 2. Fetch HTML using the interceptor
+    const response = await res.fetchRedmine(reportUrl);
+    const $ = cheerio.load(response.data);
+
+    // 3. Scrape the report table
+    let reportTable = $('table.list.report'); // Use a more robust selector for report pages
+    if (reportTable.length === 0) {
+      // Fallback to a more generic selector if the specific one fails
+      reportTable = $('table.list');
+    }
+
+    if (reportTable.length === 0) {
+      // Add server-side logging for future debugging
+      console.error("Could not find a report table in the HTML response from Redmine.");
+      return res.json({ success: true, report: { headers: [], rows: [], totals: [] }, filters: {} });
+    }
+
+    const headers: string[] = [];
+    reportTable.find('thead th').each((i, el) => {
+      headers.push($(el).text().trim());
+    });
+
+    const rows: any[] = [];
+    reportTable.find('tbody tr').each((i, tr) => {
+      const $tr = $(tr);
+      // Bỏ qua dòng total nếu nó có thể nằm trong tbody
+      if ($tr.hasClass('total')) {
+        return;
+      }
+      const cells = $tr.find('th, td');
+      const rowValues: string[] = [];
+      cells.each((j, cell) => {
+        rowValues.push($(cell).text().trim());
+      });
+      rows.push({ group: rowValues[0], values: rowValues.slice(1) });
+    });
+
+    // Tách riêng logic tìm dòng Total để xử lý trường hợp nó nằm trong <tfoot>
+    let totals: string[] = [];
+    const totalRow = reportTable.find('tbody tr.total, tfoot tr').first();
+    totalRow.find('th, td').each((j, cell) => {
+      totals.push($(cell).text().trim());
+    });
+    // 4. Scrape available filters
+    let availableFilters: any = {};
+    $('script').each((i, el) => {
+      const scriptContent = $(el).html();
+      if (scriptContent && scriptContent.includes('var availableFilters =')) {
+        const match = scriptContent.match(/var availableFilters = (\{.*?\});/);
+        if (match && match[1]) {
+          try {
+            const parsedFilters = JSON.parse(match[1]);
+            Object.keys(parsedFilters).forEach(key => {
+              if (parsedFilters[key]?.values) {
+                availableFilters[key] = parsedFilters[key].values.map((v: any[]) => ({ name: v[0], id: v[1] }));
+              }
+            });
+          } catch (e) {
+            console.error("Failed to parse JSON from script", e);
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      report: { headers, rows, totals },
+      filters: availableFilters
+    });
+
+  } catch (error: any) {
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) {
+      return res.status(401).json({ message: "Your Redmine login session has expired. Please log in again." });
+    }
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
+    }
+
+    console.error("Get Spent Time Report Error:", error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ message: "Failed to fetch or parse spent time report from Redmine" });
+  }
+};
+
+export const getSpentTimeReportFilters = async (req: any, res: any) => {
+  try {
+    const account = req.redmineAccount;
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Please link your Redmine Account first." });
+    }
+
+    const reportUrl = `${account.redmineUrl}/time_entries/report`;
+
+    // 1. Fetch HTML sử dụng interceptor (tự động kèm cookie & retry)
+    const response = await res.fetchRedmine(reportUrl);
+    const $ = cheerio.load(response.data);
+
+    let availableFilters: any = {};
+    const columns: any[] = [];
+    const criterias: any[] = [];
+
+    // =================================================================
+    // BƯỚC 1: LẤY DANH SÁCH FILTERS TỪ BIẾN JAVASCRIPT
+    // =================================================================
+    $('script').each((i, el) => {
+      const scriptContent = $(el).html();
+      if (scriptContent && scriptContent.includes('var availableFilters =')) {
+        // Dùng Regex để tóm gọn object JSON được gán cho availableFilters
+        const match = scriptContent.match(/var availableFilters\s*=\s*(\{.*?\});/);
+
+        if (match && match[1]) {
+          try {
+            availableFilters = JSON.parse(match[1]);
+          } catch (e) {
+            console.error("Failed to parse availableFilters JSON", e);
+          }
+        }
+      }
+    });
+
+    // =================================================================
+    // BƯỚC 2: LẤY CÁC TÙY CHỌN CỘT THỜI GIAN (Details / Columns)
+    // =================================================================
+    $('#columns option').each((i, el) => {
+      const val = $(el).attr('value');
+      const text = $(el).text().trim();
+      if (val) {
+        columns.push({ id: val, name: text });
+      }
+    });
+
+    // =================================================================
+    // BƯỚC 3: LẤY CÁC TÙY CHỌN NHÓM DÒNG (Add / Criterias)
+    // =================================================================
+    $('#criterias option').each((i, el) => {
+      const val = $(el).attr('value');
+      const text = $(el).text().trim();
+      if (val) {
+        criterias.push({ id: val, name: text });
+      }
+    });
+
+    // Trả về JSON sạch sẽ cho Frontend
+    res.json({
+      success: true,
+      data: {
+        filters: availableFilters, // Chứa list user, activity, project status...
+        columns: columns,          // Chứa: year, month, week, day
+        criterias: criterias       // Chứa: project, status, user, tracker...
+      }
+    });
+
+  } catch (error: any) {
+    // Bắt lỗi Middleware ném ra
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) {
+      return res.status(401).json({ message: "Your Redmine login session has expired. Please log in again." });
+    }
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
+    }
+
+    console.error("Get Spent Time Report Error:", error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({ message: "Failed to fetch or parse spent time report from Redmine" });
+  }
+};
+
+export const getRemoteFilterOptions = async (req: any, res: any) => {
+  try {
+    const { filter_name } = req.params;
+    const account = req.redmineAccount;
+
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Please link your Redmine." });
+    }
+
+    const targetUrl = `${account.redmineUrl}/queries/filter?type=TimeEntryQuery&name=${encodeURIComponent(filter_name)}`;
+
+    // Fetch dữ liệu từ Redmine
+    const response = await res.fetchRedmine(targetUrl);
+
+    let options: any[] = [];
+
+    // ==========================================
+    // TRƯỜNG HỢP 1: REDMINE TRẢ VỀ JSON ARRAY
+    // ==========================================
+    if (Array.isArray(response.data)) {
+      // Chuẩn hóa mảng: Biến mảng 1 chiều thành 2 chiều
+      options = response.data.map((item: any) => {
+        if (typeof item === 'string') {
+          // Nếu là ['PS New', 'Maint'] -> Trả về ['PS New', 'PS New']
+          return [item, item];
+        }
+        return item; // Nếu đã là [['Name', 'ID']] thì giữ nguyên
+      });
+    }
+    // ==========================================
+    // TRƯỜNG HỢP 2: REDMINE TRẢ VỀ CHUỖI HTML
+    // ==========================================
+    else if (typeof response.data === 'string') {
+      const cleanHtml = response.data.replace(/\\"/g, '"').replace(/\\\//g, '/').replace(/\\n/g, '');
+      const $ = cheerio.load(cleanHtml);
+
+      $('option').each((i, el) => {
+        const val = $(el).attr('value');
+        const text = $(el).text().trim();
+        if (val) {
+          options.push([text, val]);
+        }
+      });
+    }
+
+    res.json({ success: true, data: options });
+
+  } catch (error: any) {
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) {
+      return res.status(401).json({ message: "Your Redmine login session has expired. Please log in again." });
+    }
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
+    }
+    console.error("Fetch Remote Filter Error:", error.message);
+    res.status(500).json({ message: "Failed to fetch remote filter options from Redmine" });
+  }
+};
+export const generateSpentTimeReport = async (req: any, res: any) => {
+  try {
+    const account = req.redmineAccount;
+
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Vui lòng liên kết tài khoản Redmine." });
+    }
+
+    // Lấy nguyên cục Query String từ URL của request hiện tại (Tất cả sau dấu ?)
+    const queryString = req.originalUrl.substring(req.originalUrl.indexOf('?'));
+    if (!queryString || queryString === req.originalUrl) {
+      return res.status(400).json({ message: "Thiếu tham số filter báo cáo" });
+    }
+
+    // Ghép URL gọi thẳng lên trang Báo cáo của Redmine
+    const reportUrl = `${account.redmineUrl}/time_entries/report${queryString}`;
+
+    // Gọi bằng Interceptor
+    const response = await res.fetchRedmine(reportUrl);
+    const $ = cheerio.load(response.data);
+
+    // 1. Kiểm tra xem có dữ liệu không
+    const table = $('#time-report');
+    if (table.length === 0) {
+      return res.json({ success: true, data: { headers: [], rows: [], totals: [] } });
+    }
+
+    // 2. Bóc tách Headers (Tiêu đề cột: Project, 2026-14, Total time...)
+    const headers: string[] = [];
+    table.find('thead th').each((i, el) => {
+      headers.push($(el).text().trim());
+    });
+
+    // 3. Bóc tách các Dòng Dữ liệu
+    const rows: any[] = [];
+    table.find('tbody tr').not('.total').each((i, el) => {
+      const name = $(el).find('td.name').text().trim();
+      const hours: string[] = [];
+
+      $(el).find('td.hours').each((j, td) => {
+        hours.push($(td).text().trim()); // Nó sẽ gom chữ "1:00" hoặc ""
+      });
+
+      rows.push({ name, hours });
+    });
+
+    // 4. Bóc tách Dòng Tổng cộng (Grand Total) ở cuối
+    const totals: string[] = [];
+    table.find('tbody tr.total td.hours').each((i, el) => {
+      totals.push($(el).text().trim());
+    });
+
+    res.json({
+      success: true,
+      data: { headers, rows, totals }
+    });
+
+  } catch (error: any) {
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) {
+      return res.status(401).json({ message: "Your Redmine login session has expired. Please log in again." });
+    }
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
+    }
+
+    console.error("Generate Report Error:", error.message);
+    res.status(500).json({ message: "Lỗi khi trích xuất dữ liệu bảng báo cáo từ Redmine" });
+  }
+};
