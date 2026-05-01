@@ -437,6 +437,9 @@ window.openTab = function (evt, tabName) {
   }
 
   switch (tabName) {
+    case "calendar-tab":
+      renderCalendar();
+      break;
     case "explorer-tab":
       loadFullProjectTree();
       break;
@@ -600,7 +603,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
 
           if (result.success) {
             alert(
-              `🎉 ${result.message}\nTask ID created: #${result.data.newTaskId}`,
+              `🎉 ${result.message}\nTask #${result.data.newTaskId} created.`,
             );
 
             const draftEl = document.querySelector(
@@ -612,8 +615,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
             container.innerHTML =
               '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Retrieving the latest data from Redmine...</div>';
 
-            // 4. Gọi lại hàm load gốc (Vì globalProjectTreeData đã null, nó sẽ tự động fetch API lại từ đầu)
-            await loadFullProjectTree(true);
+            loadFullProjectTree(true); // Done need to wait for this process to finish
           } else {
             alert(`❌ Error: ${result.message}`);
           }

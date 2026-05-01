@@ -3,16 +3,17 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import qs from 'qs';
 import CryptoJS from 'crypto-js';
+import dotenv from "dotenv";
 
 import { ACCOUNT_AUTHEN_ERROR, REDMINE_AUTHEN_ERROR, REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
 import { fetchRedmineDataParallel, getTotalLoggedHours, normalizeUrl } from '../utils/redmineUtils.js';
 import { RedmineAccount } from '../models/RedmineAccount.js';
+import { getRedisClient } from '../index.js';
+
+dotenv.config();
 
 const ENCRYPT_SECRET = process.env.REDMINE_PWD_SECRET || '';
-let cachedTreeData: any = null;
-let lastCacheTime = 0;
-const CACHE_TTL = 5 * 60 * 1000;
 
 const getRedmineAccount = async (email: string) => {
   const user = await AuthorizedUser.findOne({ email });
@@ -541,22 +542,28 @@ export const getRedmineConfig = async (req: any, res: Response) => {
 
 export const getProjectTaskTree = async (req: any, res: Response) => {
   try {
-    const forceReload = req.query.reload === 'true'; // Khi user bấm nút Refresh trên UI thì truyền reload=true
+    const { projectName, taskName, taskDate, onlyShowMyTasks } = req.query;
 
-    if (!forceReload && req.query.onlyShowMyTasks !== 'true') {
-      const now = Date.now();
-      if (cachedTreeData && (now - lastCacheTime < CACHE_TTL)) {
-        return res.json(cachedTreeData);
-      }
-    }
+    const forceReload = req.query.reload === 'true';
+    const isOnlyMyTasks = req.query.onlyShowMyTasks === 'true';
 
-    const account = await getRedmineAccount(req.user.email);
+    const email = req.user.email;
+    const account = await getRedmineAccount(email);
+
     if (!account || !account.redmineApiKey || !account.redmineUrl) {
       return res.status(400).json({ message: "Missing Redmine Configuration" });
     }
 
-    // Nhận thêm param onlyShowMyTasks từ UI gửi lên (true/false)
-    const { projectName, taskName, taskDate, onlyShowMyTasks } = req.query;
+    const cacheKey = `tree_cache_${account.redmineApiKey}_${isOnlyMyTasks ? 'mine' : 'all'}`;
+
+    const redis = await getRedisClient();
+
+    if (!forceReload) {
+      const cachedData = await redis.get(cacheKey);
+      if (cachedData) {
+        return res.json(JSON.parse(cachedData));
+      }
+    }
 
     // =========================================================
     // 1. LẤY TẤT CẢ PROJECTS (Dùng hàm helper song song mới)
@@ -663,10 +670,7 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
       projectTree = filterProjectRecursive(projectTree);
     }
 
-    if (req.query.onlyShowMyTasks !== 'true') {
-      cachedTreeData = projectTree;
-      lastCacheTime = Date.now();
-    }
+    await redis.set(cacheKey, JSON.stringify(projectTree), { EX: 300 }); //300s <=> 5 min
 
     res.json(projectTree);
 

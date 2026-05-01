@@ -14,6 +14,7 @@ import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 import translate from "translate-google";
 import { isHtml } from "cheerio/utils";
+import { createClient } from "redis";
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -46,6 +47,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const redisClient = createClient({ url: process.env.REDIS_URL });
+redisClient.on('error', (err) => console.error('Redis Client Error', err));
+
 const DB_URL = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_USER_PASSWORD}@${process.env.DB_CLUSTER_PATH}`;
 const connect = mongoose.connect(DB_URL, { family: 4, dbName: process.env.DB_NAME });
 
@@ -54,6 +58,13 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 connect.then((db) => {
   console.log("Connect server success");
 });
+
+export const getRedisClient = async () => {
+  if (!redisClient.isOpen) {
+    await redisClient.connect();
+  }
+  return redisClient;
+};
 
 app.use(async (req, res, next) => {
   try {
