@@ -1,6 +1,7 @@
 import { fetchWithAuth } from "./redmine.js";
 
 let activityMap = {};
+let globalDrafts = [];
 
 export async function initDraftWidget() {
   // Gán ngày mặc định là hôm nay (Sửa lỗi Timezone)
@@ -12,6 +13,31 @@ export async function initDraftWidget() {
 
   // Lắng nghe sự kiện Add
   document.getElementById("btnAddDraft").onclick = handleAddDraft;
+
+  // Event search draft
+  document.getElementById("draftSearchInput").addEventListener("input", (e) => {
+    const keyword = e.target.value.trim().toLowerCase();
+
+    if (!keyword) {
+      renderDraftList(globalDrafts); // Xóa hết thì render lại full
+      return;
+    }
+
+    // Thuật toán tìm kiếm (Không phân biệt hoa thường, chứa nửa chữ cũng lấy)
+    const filteredDrafts = globalDrafts.filter((draft) => {
+      const activityName =
+        activityMap[draft.activityId] || `Act #${draft.activityId}`;
+
+      // Tìm trong Subject hoặc Activity Name hoặc Date
+      return (
+        draft.subject.toLowerCase().includes(keyword) ||
+        activityName.toLowerCase().includes(keyword) ||
+        draft.spentOn.includes(keyword)
+      );
+    });
+
+    renderDraftList(filteredDrafts, keyword);
+  });
 
   await loadActivities();
   await loadDrafts();
@@ -40,6 +66,7 @@ export async function loadDrafts() {
     const result = await res.json();
 
     if (result.success) {
+      globalDrafts = result.data;
       renderDraftList(result.data);
     }
   } catch (error) {
@@ -47,29 +74,49 @@ export async function loadDrafts() {
   }
 }
 
-function renderDraftList(drafts) {
+function highlightText(text, keyword) {
+  if (!keyword) return text; // Không có chữ thì trả về nguyên gốc
+
+  // Thoát (escape) các ký tự đặc biệt của Regex (vd: +, ?, *, [, ],...) để không bị văng lỗi khi gõ
+  const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  // /gi nghĩa là: g = global (tìm tất cả), i = case-insensitive (không phân biệt hoa thường)
+  const regex = new RegExp(`(${safeKeyword})`, "gi");
+
+  // Bọc phần text khớp bằng thẻ mark kèm chút CSS cho đẹp
+  return text.replace(
+    regex,
+    '<mark style="background-color: #fef08a; border-radius: 2px; padding: 0 2px;">$1</mark>',
+  );
+}
+
+function renderDraftList(drafts, keyword = "") {
   const container = document.getElementById("draftListContainer");
   document.getElementById("draftCount").innerText = drafts.length;
   container.innerHTML = "";
 
   if (drafts.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; padding: 10px;">Chưa có bản nháp nào</div>`;
+    container.innerHTML = `<div style="text-align: center; color: #94a3b8; font-size: 0.85rem; padding: 10px;">You haven't created any task drafts yet.</div>`;
     return;
   }
 
   drafts.forEach((draft) => {
     const div = document.createElement("div");
     div.className = "draft-item";
-    div.draggable = true; // Kích hoạt kéo thẻ
+    div.draggable = true;
 
-    // Lấy tên Activity từ Map, nếu không có (ví dụ bị xóa trên Redmine) thì hiện ID tạm
     const activityName =
       activityMap[draft.activityId] || `Act #${draft.activityId}`;
 
+    // Áp dụng highlight cho Subject, Activity và Ngày
+    const highlightedSubject = highlightText(draft.subject, keyword);
+    const highlightedActivity = highlightText(activityName, keyword);
+    const highlightedDate = highlightText(draft.spentOn, keyword);
+
     div.innerHTML = `
       <div style="display: flex; flex-direction: column;">
-        <span class="draft-title">${draft.subject}</span>
-        <span class="draft-meta">⏱ ${draft.hours}h | 🏷 ${activityName} | 📅 ${draft.spentOn}</span>
+        <span class="draft-title">${highlightedSubject}</span>
+        <span class="draft-meta">⏱ ${draft.hours}h | 🏷 ${highlightedActivity} | 📅 ${highlightedDate}</span>
       </div>
       <button class="btn-del-draft" data-id="${draft._id}">&times;</button>
     `;
