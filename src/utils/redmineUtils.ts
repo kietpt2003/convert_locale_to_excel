@@ -116,3 +116,39 @@ export const normalizeUrl = (url: string | null | undefined): string => {
     .trim()
     .replace(/^\/+|\/+$/g, ''); // Regex: Xóa tất cả '/' ở bắt đầu (^) hoặc kết thúc ($)
 };
+
+export const fetchRedmineDataParallel = async (url: string, apiKey: string, params: any, dataKey: string) => {
+  const firstRes = await axios.get(url, {
+    headers: { 'X-Redmine-API-Key': apiKey },
+    params: { ...params, limit: 1, offset: 0 }
+  });
+
+  const totalCount = firstRes.data.total_count;
+  if (!totalCount || totalCount === 0) return [];
+
+  const limit = 100;
+  const totalPages = Math.ceil(totalCount / limit);
+  const fetchFunctions = [];
+
+  // Tạo mảng CÁC HÀM (chưa thực thi promise vội)
+  for (let i = 0; i < totalPages; i++) {
+    const offset = i * limit;
+    fetchFunctions.push(() => axios.get(url, {
+      headers: { 'X-Redmine-API-Key': apiKey },
+      params: { ...params, limit, offset }
+    }).then(res => res.data[dataKey] || []));
+  }
+
+  // CHIA LÔ ĐỂ BẮN (Bắn 10 trang cùng lúc, xong mới bắn 10 trang tiếp theo)
+  const batchSize = 10;
+  const results = [];
+
+  for (let i = 0; i < fetchFunctions.length; i += batchSize) {
+    const batch = fetchFunctions.slice(i, i + batchSize);
+    // Thực thi 10 hàm cùng lúc
+    const batchResults = await Promise.all(batch.map(fn => fn()));
+    results.push(...batchResults);
+  }
+
+  return results.flat();
+};

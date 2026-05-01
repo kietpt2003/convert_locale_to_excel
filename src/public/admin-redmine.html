@@ -363,19 +363,48 @@
                   Please click Refresh to reload the latest data.</span
                 >
               </div>
-              <div class="search-bar">
-                <input
-                  type="text"
-                  id="treeSearchProject"
-                  placeholder="Search project..."
-                />
-                <input
-                  type="text"
-                  id="treeSearchTask"
-                  placeholder="Search task..."
-                />
+
+              <div
+                class="search-bar"
+                style="
+                  display: flex;
+                  flex-direction: column;
+                  gap: 10px;
+                  padding: 15px;
+                  border-bottom: 1px solid #e2e8f0;
+                "
+              >
+                <div style="display: flex; gap: 10px">
+                  <input
+                    type="text"
+                    id="treeSearchProject"
+                    placeholder="Search project..."
+                    style="flex: 1; margin: 0"
+                  />
+                  <input
+                    type="text"
+                    id="treeSearchTask"
+                    placeholder="Search task..."
+                    style="flex: 1; margin: 0"
+                  />
+                </div>
+
+                <div class="toggle-container">
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="chkOnlyMyTasks" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <label for="chkOnlyMyTasks" class="toggle-label-text">
+                    Only show my tasks
+                  </label>
+                </div>
               </div>
-              <div class="tree-explorer-container" id="projectTreeContainer">
+
+              <div
+                class="tree-explorer-container"
+                id="projectTreeContainer"
+                style="padding: 15px"
+              >
                 <div class="loading-state">Loading hierarchy...</div>
               </div>
             </div>

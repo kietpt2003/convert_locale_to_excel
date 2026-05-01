@@ -6,10 +6,13 @@ import CryptoJS from 'crypto-js';
 
 import { ACCOUNT_AUTHEN_ERROR, REDMINE_AUTHEN_ERROR, REDMINE_LOG_TIME_ACTIVITY, REDMINE_PROJECT_STATUS, REDMINE_TASK_TRACKER_ID } from '../constants/redmine.js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
-import { getTotalLoggedHours, normalizeUrl } from '../utils/redmineUtils.js';
+import { fetchRedmineDataParallel, getTotalLoggedHours, normalizeUrl } from '../utils/redmineUtils.js';
 import { RedmineAccount } from '../models/RedmineAccount.js';
 
 const ENCRYPT_SECRET = process.env.REDMINE_PWD_SECRET || '';
+let cachedTreeData: any = null;
+let lastCacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000;
 
 const getRedmineAccount = async (email: string) => {
   const user = await AuthorizedUser.findOne({ email });
@@ -538,43 +541,63 @@ export const getRedmineConfig = async (req: any, res: Response) => {
 
 export const getProjectTaskTree = async (req: any, res: Response) => {
   try {
+    const forceReload = req.query.reload === 'true'; // Khi user bấm nút Refresh trên UI thì truyền reload=true
+
+    if (!forceReload && req.query.onlyShowMyTasks !== 'true') {
+      const now = Date.now();
+      if (cachedTreeData && (now - lastCacheTime < CACHE_TTL)) {
+        return res.json(cachedTreeData);
+      }
+    }
+
     const account = await getRedmineAccount(req.user.email);
     if (!account || !account.redmineApiKey || !account.redmineUrl) {
       return res.status(400).json({ message: "Missing Redmine Configuration" });
     }
 
-    const { projectName, taskName, taskDate } = req.query;
+    // Nhận thêm param onlyShowMyTasks từ UI gửi lên (true/false)
+    const { projectName, taskName, taskDate, onlyShowMyTasks } = req.query;
 
-    // 1. Lấy TẤT CẢ Project (giới hạn 1000 là mức tối đa của Redmine API)
-    const projectsRes = await axios.get(`${account.redmineUrl}/projects.json`, {
-      headers: { 'X-Redmine-API-Key': account.redmineApiKey },
-      params: { status: REDMINE_PROJECT_STATUS.ACTIVE, limit: 1000 }
-    });
-
-    const allProjects = projectsRes.data.projects;
+    // =========================================================
+    // 1. LẤY TẤT CẢ PROJECTS (Dùng hàm helper song song mới)
+    // =========================================================
+    const allProjects = await fetchRedmineDataParallel(
+      `${account.redmineUrl}/projects.json`,
+      account.redmineApiKey,
+      { status: REDMINE_PROJECT_STATUS.ACTIVE },
+      'projects'
+    );
     const allProjectIds = new Set(allProjects.map((p: any) => p.id));
 
-    // 2. Lấy Task của User
-    const taskParams: any = { assigned_to_id: "me", status_id: "*", limit: 1000 };
+    // =========================================================
+    // 2. LẤY TASKS (Tất cả hoặc của riêng tôi tùy param)
+    // =========================================================
+    const taskParams: any = { status_id: "*" }; // Mặc định lấy tất cả các trạng thái
+
+    // Nếu Client truyền onlyShowMyTasks = true thì mới filter theo ID của mình
+    if (onlyShowMyTasks === 'true') {
+      taskParams.assigned_to_id = "me";
+    }
+
     if (taskDate) taskParams.created_on = taskDate;
 
-    const tasksRes = await axios.get(`${account.redmineUrl}/issues.json`, {
-      headers: { 'X-Redmine-API-Key': account.redmineApiKey },
-      params: taskParams
-    });
-
-    let allMyTasks = tasksRes.data.issues;
+    let allTasks = await fetchRedmineDataParallel(
+      `${account.redmineUrl}/issues.json`,
+      account.redmineApiKey,
+      taskParams,
+      'issues'
+    );
 
     // --- CẢI TIẾN 1: Tìm kiếm Task theo ID hoặc Name ---
     if (taskName) {
       const tSearch = String(taskName).toLowerCase();
-      allMyTasks = allMyTasks.filter((t: any) =>
+      allTasks = allTasks.filter((t: any) =>
         t.subject.toLowerCase().includes(tSearch) ||
-        t.id.toString().includes(tSearch) // Tìm kiếm ID theo kiểu chứa chuỗi (86 nằm trong 8690)
+        t.id.toString().includes(tSearch)
       );
     }
 
-    // --- Hàm dựng cây Task (Giữ nguyên logic của bạn nhưng tối ưu filter) ---
+    // --- Hàm dựng cây Task ---
     const buildTaskTree = (nodes: any[], parentId: number | null, allIdsInProject: Set<any>): any[] => {
       return nodes
         .filter((t: any) => {
@@ -599,7 +622,8 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
             : (pId === parentId);
         })
         .map((project: any) => {
-          const projectTasks = allMyTasks.filter((t: any) => t.project.id === project.id);
+          // Bắt các task vào đúng project
+          const projectTasks = allTasks.filter((t: any) => t.project.id === project.id);
           const projectTaskIds = new Set(projectTasks.map((t: any) => t.id));
 
           return {
@@ -615,9 +639,9 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
     // 3. Dựng cây toàn bộ
     let projectTree = buildProjectTree(null);
 
-    // --- CẢI TIẾN 2: Lọc đệ quy cho Project (ID hoặc Name) ---
-    if (projectName) {
-      const pSearch = String(projectName).toLowerCase();
+    // --- CẢI TIẾN 2: Lọc đệ quy cho Project ---
+    if (projectName || taskName || onlyShowMyTasks === 'true') {
+      const pSearch = projectName ? String(projectName).toLowerCase() : "";
 
       const filterProjectRecursive = (list: any[]): any[] => {
         return list
@@ -627,20 +651,26 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
           }))
           .filter(p => {
             const matchesName = p.name.toLowerCase().includes(pSearch);
-            const matchesId = p.id.toString().includes(pSearch); // Tìm kiếm ID project kiểu chứa chuỗi
+            const matchesId = p.id.toString().includes(pSearch);
             const hasTasks = p.tasks.length > 0;
             const hasMatchingChildren = p.subProjects.length > 0;
 
-            return matchesName || matchesId || hasMatchingChildren || hasTasks;
+            // Xử lý giữ lại cây: Nếu có search name thì bắt name. 
+            // Nếu không search name (nhưng có lọc task) thì project nào có task mới hiện
+            return (projectName && (matchesName || matchesId)) || hasMatchingChildren || hasTasks;
           });
       };
       projectTree = filterProjectRecursive(projectTree);
     }
 
+    if (req.query.onlyShowMyTasks !== 'true') {
+      cachedTreeData = projectTree;
+      lastCacheTime = Date.now();
+    }
+
     res.json(projectTree);
 
   } catch (error: any) {
-    console.error("Tree Data Error:", error.message);
     res.status(500).json({ message: "Failed to get projects tasks" });
   }
 };
@@ -1306,66 +1336,95 @@ export const getProjectTaskTreeV2 = async (req: any, res: any) => {
     const globalTaskMap = new Map(); // Dùng Map để khử trùng lặp
 
     const fetchTasksForProject = async (projectIdentifier: string) => {
-      let page = 1;
-      let hasNextPage = true;
+      // Hàm helper dùng chung để parse data từ 1 trang HTML
+      const parsePageHTML = ($page: any) => {
+        const rows = $page('table.issues tbody tr');
+        if (rows.length === 0) return;
 
-      while (hasNextPage) {
-        // QUAN TRỌNG: Đã đổi limit=100 thành per_page=100 để cào nhanh hơn
-        const url = `${account.redmineUrl}/projects/${projectIdentifier}/issues?set_filter=1&sort=id:desc&c[]=project&c[]=parent&c[]=tracker&c[]=subject&c[]=status&c[]=priority&c[]=assigned_to&per_page=100&page=${page}`;
+        rows.each((i: any, el: any) => {
+          const $el = $page(el);
+          const idText = $el.find('td.id a').text().trim();
+          if (!idText) return;
 
-        try {
-          const response = await res.fetchRedmine(url);
-          const $ = cheerio.load(response.data);
-          const rows = $('table.issues tbody tr');
+          const id = parseInt(idText, 10);
+          const subject = $el.find('td.subject a').text().trim();
+          const status = $el.find('td.status').text().trim();
 
-          if (rows.length === 0) break;
+          // Lấy Parent ID an toàn bằng Regex
+          const parentText = $el.find('td.parent').text().trim();
+          const parentMatch = parentText.match(/\d+/);
+          const parentId = parentMatch ? parseInt(parentMatch[0], 10) : null;
 
-          rows.each((i, el) => {
-            const $el = $(el);
-            const idText = $el.find('td.id a').text().trim();
-            if (!idText) return;
+          const projNameHTML = $el.find('td.project').text().trim();
+          const projectId = projectNameToIdMap.get(projNameHTML) || null;
 
-            const id = parseInt(idText, 10);
-            const subject = $el.find('td.subject a').text().trim();
-            const status = $el.find('td.status').text().trim();
+          const isMine = $el.hasClass('assigned-to-me');
 
-            // LẤY PARENT ID BẰNG REGEX ĐỂ CHỐNG LỖI NaN
-            const parentText = $el.find('td.parent').text().trim();
-            const parentMatch = parentText.match(/\d+/);
-            const parentId = parentMatch ? parseInt(parentMatch[0], 10) : null;
-
-            const projNameHTML = $el.find('td.project').text().trim();
-            const projectId = projectNameToIdMap.get(projNameHTML) || null;
-
-            const isMine = $el.hasClass('assigned-to-me');
-
-            globalTaskMap.set(id, {
-              id,
-              subject,
-              status: { name: status },
-              parent: parentId ? { id: parentId } : null,
-              project: { id: projectId, name: projNameHTML, identifier: projectIdentifier },
-              isMine: isMine
-            });
+          // Lưu thẳng vào biến toàn cục globalTaskMap
+          globalTaskMap.set(id, {
+            id,
+            subject,
+            status: { name: status },
+            parent: parentId ? { id: parentId } : null,
+            project: { id: projectId, name: projNameHTML, identifier: projectIdentifier },
+            isMine: isMine
           });
+        });
+      };
 
-          // Nhận diện phân trang
-          hasNextPage = $('.next.page').length > 0 || $('.next').length > 0;
-          page++;
-        } catch (err) {
-          console.error(`Lỗi cào project ${projectIdentifier} page ${page}:`, err);
-          break;
+      try {
+        // 1. FETCH TRANG ĐẦU TIÊN (Để mồi data và lấy tổng số trang)
+        const firstPageUrl = `${account.redmineUrl}/projects/${projectIdentifier}/issues?set_filter=1&sort=id:desc&c[]=project&c[]=parent&c[]=tracker&c[]=subject&c[]=status&c[]=priority&c[]=assigned_to&per_page=100&page=1`;
+
+        const firstResponse = await res.fetchRedmine(firstPageUrl);
+        const $ = cheerio.load(firstResponse.data);
+
+        // Parse data trang 1 luôn
+        parsePageHTML($);
+
+        // 2. TÍNH TỔNG SỐ TRANG
+        // Tìm text dạng "(1-100/286)" để trích xuất con số 286
+        const itemsText = $('.pagination .items').text().trim();
+        let totalPages = 1;
+
+        if (itemsText) {
+          const match = itemsText.match(/\/(\d+)\)/); // Regex tìm con số sau dấu "/" và trước dấu ")"
+          if (match && match[1]) {
+            const totalItems = parseInt(match[1], 10);
+            totalPages = Math.ceil(totalItems / 100); // Làm tròn lên (vd: 286/100 = 3 trang)
+          }
         }
+
+        // 3. FETCH SONG SONG CÁC TRANG CÒN LẠI (TỪ TRANG 2)
+        if (totalPages > 1) {
+          const pagePromises = [];
+
+          for (let page = 2; page <= totalPages; page++) {
+            const pageUrl = `${account.redmineUrl}/projects/${projectIdentifier}/issues?set_filter=1&sort=id:desc&c[]=project&c[]=parent&c[]=tracker&c[]=subject&c[]=status&c[]=priority&c[]=assigned_to&per_page=100&page=${page}`;
+
+            // Tạo promise: Fetch -> Load Cheerio -> Parse
+            const promise = res.fetchRedmine(pageUrl)
+              .then((pageRes: any) => {
+                const $page = cheerio.load(pageRes.data);
+                parsePageHTML($page);
+              })
+              .catch((err: any) => {
+                console.error(`Lỗi cào project ${projectIdentifier} page ${page}:`, err.message);
+              });
+
+            pagePromises.push(promise);
+          }
+
+          // Kích hoạt chạy đồng loạt tất cả các trang
+          await Promise.all(pagePromises);
+        }
+
+      } catch (err: any) {
+        console.error(`Lỗi cào project ${projectIdentifier} page 1:`, err.message);
       }
     };
 
-    // CHUNK PROCESSING: Cào 5 project cùng lúc
-    const chunkSize = 10;
-    for (let i = 0; i < allProjects.length; i += chunkSize) {
-      const chunk = allProjects.slice(i, i + chunkSize);
-      // Dùng identifier từ JSON để cào Task
-      await Promise.all(chunk.map((p: any) => fetchTasksForProject(p.identifier)));
-    }
+    await Promise.all(allProjects.map((p: any) => fetchTasksForProject(p.identifier)));
 
     let allTasks = Array.from(globalTaskMap.values());
 

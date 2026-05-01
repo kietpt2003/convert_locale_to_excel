@@ -103,7 +103,7 @@ export async function initApp() {
         '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Fetch new data from Redmine...</div>';
 
       // 4. Gọi lại hàm load gốc (Vì globalProjectTreeData đã null, nó sẽ tự động fetch API lại từ đầu)
-      await loadFullProjectTree();
+      await loadFullProjectTree(true);
     });
 
   // Event SHOW/HIDE PASSWORD
@@ -577,21 +577,22 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
 
       if (
         confirm(
-          `🤖 AUTO-MATION: \n\n1. Tạo Task con: "${draftData.subject}"\n2. Log ${draftData.hours}h vào Task #${parentTaskId} ngày ${draftData.spentOn}\n\nThực thi ngay?`,
+          `🤖 AUTO-MATION: \n\nCreate sub-task "${draftData.subject}" for Task #${parentTaskId}. Then log ${draftData.hours}h on ${draftData.spentOn}\n\nProcess now?`,
         )
       ) {
         try {
-          showLoadingOverlay("Hệ thống đang tự động tạo Task và Log time...");
+          showLoadingOverlay(
+            "The system is automatically creating tasks and logging time...",
+          );
 
           const res = await fetchWithAuth("/api/redmine/drafts/execute", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               draftId: draftData._id,
-              // parentTaskId: parentTaskId,
-              parentTaskId: 8292,
+              parentTaskId: parentTaskId,
               projectId: projectId,
-              // activityId: 9 // Mở comment này nếu Redmine của bạn BẮT BUỘC có Activity ID
+              activityId: draftData.activityId,
             }),
           });
 
@@ -599,30 +600,25 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
 
           if (result.success) {
             alert(
-              `🎉 ${result.message}\nTask ID mới sinh ra: #${result.data.newTaskId}`,
+              `🎉 ${result.message}\nTask ID created: #${result.data.newTaskId}`,
             );
 
-            // Xóa thẻ nháp khỏi giao diện ngay lập tức cho mượt
             const draftEl = document.querySelector(
               `.draft-item .btn-del-draft[data-id="${draftData._id}"]`,
             );
             if (draftEl) draftEl.closest(".draft-item").remove();
 
-            // 2. XÓA CACHE CŨ
-            globalProjectTreeData = null;
-
-            // 3. Hiển thị trạng thái loading
             const container = document.getElementById("projectTreeContainer");
             container.innerHTML =
-              '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Đang lấy dữ liệu mới nhất từ Redmine...</div>';
+              '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Retrieving the latest data from Redmine...</div>';
 
             // 4. Gọi lại hàm load gốc (Vì globalProjectTreeData đã null, nó sẽ tự động fetch API lại từ đầu)
-            await loadFullProjectTree();
+            await loadFullProjectTree(true);
           } else {
-            alert(`❌ Lỗi: ${result.message}`);
+            alert(`❌ Error: ${result.message}`);
           }
         } catch (error) {
-          alert("Lỗi mạng hoặc máy chủ không phản hồi.");
+          alert("Network error or server not responding.");
         } finally {
           hideLoadingOverlay();
         }
@@ -636,18 +632,35 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
   });
 }
 
-async function loadFullProjectTree() {
+async function loadFullProjectTree(forceReload = false) {
   const container = document.getElementById("projectTreeContainer");
+  const isOnlyMine = document.getElementById("chkOnlyMyTasks").checked;
+
+  if (forceReload) {
+    globalProjectTreeData = null;
+  }
 
   // 1. CHỈ GỌI API NẾU CHƯA CÓ DỮ LIỆU GỐC
   if (!globalProjectTreeData) {
     container.style.opacity = "0.5";
+    const iconSvg = document.getElementById("iconReloadTree");
+
     try {
-      const iconSvg = document.getElementById("iconReloadTree");
       if (iconSvg) iconSvg.style.animation = "spin 1s linear infinite";
 
-      // Gọi API lấy toàn bộ dữ liệu (Không truyền tham số search)
-      const response = await fetchWithAuth(`/api/redmine/projects/tasks`);
+      let waitTimeout;
+
+      waitTimeout = setTimeout(() => {
+        container.innerHTML =
+          '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Your company has lots of tasks, please wait until we can get all for you...</div>';
+      }, 15000);
+
+      const response = await fetchWithAuth(
+        `/api/redmine/projects/tasks?reload=${forceReload}&onlyShowMyTasks=${isOnlyMine}`,
+      );
+
+      clearTimeout(waitTimeout);
+
       globalProjectTreeData = await response.json();
 
       const now = new Date();
@@ -661,12 +674,11 @@ async function loadFullProjectTree() {
         second: "2-digit",
       });
       document.getElementById("lastUpdatedTime").innerText = timeString;
-
-      if (iconSvg) iconSvg.style.animation = "none";
     } catch (error) {
-      if (iconSvg) iconSvg.style.animation = "none";
       container.innerHTML = '<div class="error-state">Error loading data</div>';
-      return;
+    } finally {
+      if (iconSvg) iconSvg.style.animation = "none";
+      container.style.opacity = "1"; // Trả lại độ sáng
     }
   }
 
@@ -776,7 +788,7 @@ const debouncedLoadTree = debounce(() => {
 // 2. REDMINE LOGIN MODAL LOGIC
 // ==========================================
 function showRedmineLoginModal(
-  message = "Vui lòng đăng nhập Redmine.",
+  message = "Please login to your Redmine.",
   isUpdateMode = false,
 ) {
   const modal = document.getElementById("redmineLoginOverlay");
@@ -830,18 +842,18 @@ async function handleRedmineLogin() {
     if (res.ok) {
       // Thành công! Đóng modal và Refresh lại toàn bộ dữ liệu trên trang
       document.getElementById("redmineLoginOverlay").style.display = "none";
-      alert("Kết nối Redmine thành công!");
+      alert("Login to your Redmine success!");
 
       // Reload lại app để cập nhật data bằng Session Cookie mới
       window.location.reload();
     } else {
       errEl.innerText =
-        data.message || "Sai mật khẩu hoặc cấu hình không đúng.";
+        data.message || "Incorrect password or incorrect configuration.";
       errEl.style.display = "block";
     }
   } catch (err) {
     if (err.message !== "REDMINE_AUTH_REQUIRED") {
-      errEl.innerText = "Lỗi kết nối máy chủ!";
+      errEl.innerText = "Server connection error!";
       errEl.style.display = "block";
     }
   } finally {
@@ -856,8 +868,26 @@ document
 document
   .getElementById("treeSearchTask")
   .addEventListener("input", debouncedLoadTree);
+document
+  .getElementById("chkOnlyMyTasks")
+  .addEventListener("change", async function () {
+    const container = document.getElementById("projectTreeContainer");
+    const lastUpdatedTimeEl = document.getElementById("lastUpdatedTime");
 
-export function showLoadingOverlay(message = "Đang xử lý, vui lòng đợi...") {
+    // Hiển thị trạng thái đang xử lý trên UI
+    container.style.opacity = "0.5";
+
+    container.innerHTML =
+      '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Fetch new data from Redmine...</div>';
+
+    await loadFullProjectTree(true);
+
+    container.style.opacity = "1";
+  });
+
+export function showLoadingOverlay(
+  message = "It's being processed, please wait...",
+) {
   let overlay = document.getElementById("global-loading-overlay");
 
   // Nếu DOM chưa có khối này thì tự động tạo ra và gắn vào Body
