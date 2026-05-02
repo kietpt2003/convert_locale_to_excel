@@ -1079,7 +1079,7 @@ select.form-control[size] {
 }
 
 /* Hiệu ứng Đích đến (Drop Zone) khi rê thẻ nháp vào Task cha */
-.tree-node.drag-over {
+.tree-row.drag-over {
   background-color: #eff6ff !important;
   border: 2px dashed #3b82f6 !important;
 }
