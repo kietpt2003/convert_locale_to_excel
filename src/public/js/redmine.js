@@ -3,6 +3,7 @@ import {
   changeMonth,
   goToToday,
   initQuickSelectors,
+  initGlobalTooltip,
 } from "./calendar.js";
 import { debounce } from "./debounce.js";
 import { initDraftWidget } from "./draftWidget.js";
@@ -12,6 +13,7 @@ import {
 } from "./projectRedmineExplorer.js";
 import { initCreateTaskTab } from "./tabCreateTask.js";
 import { initSpentTimeReportTab } from "./tabSpentTimeReport.js";
+import { initUserGuide } from "./userGuide.js";
 
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
@@ -142,9 +144,11 @@ export async function initApp() {
     btnSave.addEventListener("click", saveRedmineConfig);
   }
 
+  initGlobalTooltip();
   initQuickSelectors();
   initQuickModalEvents();
   initDraftWidget();
+  initUserGuide();
 
   document.getElementById("prevMonth").onclick = () => changeMonth(-1);
   document.getElementById("nextMonth").onclick = () => changeMonth(1);

@@ -205,3 +205,55 @@ function syncSelectors() {
     sYear.value = currentViewDate.getFullYear();
   }
 }
+
+export function initGlobalTooltip() {
+  // 1. Kiểm tra xem tooltip đã được tạo chưa (tránh tạo trùng lặp nếu gọi hàm 2 lần)
+  if (document.getElementById("global-tooltip")) return;
+
+  // 2. Tạo thẻ Tooltip và gắn vào body
+  const tooltip = document.createElement("div");
+  tooltip.id = "global-tooltip";
+  document.body.appendChild(tooltip);
+
+  // 3. Lắng nghe sự kiện hover (mouseover)
+  document.addEventListener("mouseover", (e) => {
+    // Dùng e.target.closest để bắt chính xác dù user di chuột vào chữ hay viền của log-item
+    const logItem = e.target.closest(".log-item");
+
+    if (logItem) {
+      const comment = logItem.getAttribute("data-comment");
+      if (!comment || comment.trim() === "") return;
+
+      // Nhét chữ vào trước để nó tính toán được chiều rộng/cao
+      tooltip.innerHTML = comment;
+      tooltip.classList.add("show");
+
+      // Lấy tọa độ của thẻ log-item
+      const rect = logItem.getBoundingClientRect();
+
+      // Tính toán vị trí x, y
+      const leftPos = rect.left + rect.width / 2 - tooltip.offsetWidth / 2;
+      const topPos = rect.top - tooltip.offsetHeight - 5;
+
+      tooltip.style.left = `${leftPos}px`;
+      tooltip.style.top = `${topPos}px`;
+    }
+  });
+
+  // 4. Lắng nghe sự kiện di chuột ra ngoài (mouseout)
+  document.addEventListener("mouseout", (e) => {
+    const logItem = e.target.closest(".log-item");
+    if (logItem) {
+      tooltip.classList.remove("show");
+    }
+  });
+
+  // 5. Ẩn tooltip khi người dùng lăn chuột (scroll)
+  document.addEventListener(
+    "scroll",
+    () => {
+      tooltip.classList.remove("show");
+    },
+    true,
+  );
+}

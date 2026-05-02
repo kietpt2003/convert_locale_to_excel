@@ -482,6 +482,7 @@ table tbody tr:hover {
 }
 
 .log-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 6px;
@@ -538,25 +539,27 @@ table tbody tr:hover {
   cursor: help;
 }
 
-.log-item:hover::after {
-  content: attr(data-comment);
-  position: absolute;
-  bottom: 100%;
-  left: 0;
+/* Tooltip toàn cục gắn ở Body */
+#global-tooltip {
+  position: fixed;
   background: #2d3748;
   color: #fff;
-  padding: 5px 10px;
+  padding: 6px 10px;
   border-radius: 4px;
-  width: max-content;
+  font-size: 11px;
   max-width: 250px;
-  z-index: 10;
+  z-index: 99999; /* Đảm bảo nổi lên trên tất cả */
+  pointer-events: none; /* Không cản trở click chuột */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease-in-out;
   white-space: normal;
-  pointer-events: none;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.log-item[data-comment=""]:hover::after,
-.log-item:not([data-comment]):hover::after {
-  display: none;
+#global-tooltip.show {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* Calendar Status Colors */
