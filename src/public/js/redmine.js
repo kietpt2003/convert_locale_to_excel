@@ -638,7 +638,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
   });
 }
 
-async function loadFullProjectTree(forceReload = false) {
+export async function loadFullProjectTree(forceReload = false) {
   const container = document.getElementById("projectTreeContainer");
   const isOnlyMine = document.getElementById("chkOnlyMyTasks").checked;
 

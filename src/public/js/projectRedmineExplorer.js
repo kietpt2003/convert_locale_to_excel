@@ -1,4 +1,4 @@
-import { fetchWithAuth } from "./redmine.js";
+import { fetchWithAuth, loadFullProjectTree } from "./redmine.js";
 import { renderCalendar } from "./calendar.js";
 /**
  * Mở modal Log Time nhanh từ cây thư mục
@@ -85,7 +85,8 @@ export function initQuickModalEvents() {
         alert("✅ Logged successfully!");
         modal.style.display = "none";
         document.getElementById("quickModalDescription").value = "";
-        await renderCalendar(); // Refresh calendar để cập nhật giờ
+        loadFullProjectTree(true);
+        renderCalendar(); // Refresh calendar để cập nhật giờ
       } else {
         const result = await res.json();
         alert(`⚠️ ${result.message}`);
