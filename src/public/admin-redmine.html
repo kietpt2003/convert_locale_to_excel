@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Redmine Automation Tool</title>
     <link rel="stylesheet" href="/css/style-redmine.css" />
+    <link rel="stylesheet" href="/css/style-user-guide.css" />
   </head>
   <body>
     <div class="container">
@@ -388,12 +389,14 @@
                     id="treeSearchProject"
                     placeholder="Search project..."
                     style="flex: 1; margin: 0"
+                    autocomplete="off"
                   />
                   <input
                     type="text"
                     id="treeSearchTask"
                     placeholder="Search task..."
                     style="flex: 1; margin: 0"
+                    autocomplete="off"
                   />
                 </div>
 
@@ -432,6 +435,7 @@
                     id="tabProjectSearch"
                     class="explorer-search"
                     placeholder="🔍 Search project name or ID..."
+                    autocomplete="off"
                   />
                 </div>
                 <div id="tabProjectList" class="explorer-list-box"></div>
@@ -447,6 +451,7 @@
                     class="explorer-search"
                     placeholder="🔍 Search task name or #ID..."
                     disabled
+                    autocomplete="off"
                   />
                 </div>
                 <div id="tabParentTaskList" class="explorer-list-box"></div>
@@ -872,6 +877,66 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <button
+      id="btnOpenGuide"
+      class="btn-confirm"
+      style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        border-radius: 20px;
+        padding: 10px 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        z-index: 100;
+      "
+    >
+      📖 User Guide
+    </button>
+
+    <div id="userGuideModal" class="guide-modal-overlay">
+      <div class="guide-modal">
+        <div class="guide-sidebar">
+          <div class="guide-sidebar-header">📚 User Guide</div>
+          <ul id="guideTabs" class="guide-tab-list"></ul>
+        </div>
+
+        <div class="guide-content-area">
+          <button class="guide-close-btn" id="btnCloseGuide">&times;</button>
+
+          <div class="guide-body">
+            <h2 id="guideTitle" class="guide-step-title">Title</h2>
+            <p id="guideText" class="guide-step-text">
+              The instructions contain detailed content...
+            </p>
+            <img
+              id="guideImage"
+              class="guide-step-img"
+              src=""
+              alt="Guide Image"
+            />
+          </div>
+
+          <div class="guide-footer">
+            <button id="guideBtnPrev" class="guide-btn btn-back">Back</button>
+            <div id="guideDots" class="guide-dots"></div>
+            <button id="guideBtnNext" class="guide-btn btn-next">Next</button>
+            <button
+              id="guideBtnDone"
+              class="guide-btn btn-done"
+              style="display: none"
+            >
+              Understood (Close)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="guideImgFullOverlay" class="guide-img-full-overlay">
+      <span class="guide-img-full-close">&times;</span>
+      <img id="guideImgFull" src="" alt="Full Screen" />
     </div>
 
     <script type="module">
