@@ -584,7 +584,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
 
       if (
         confirm(
-          `🤖 AUTO-MATION: \n\nCreate sub-task "${draftData.subject}" for Task #${parentTaskId}. Then log ${draftData.hours}h on ${draftData.spentOn}\n\nProcess now?`,
+          `🤖 Automation: \n\nCreate sub-task "${draftData.subject}" for Task #${parentTaskId}. Then log ${draftData.hours}h on ${draftData.spentOn}\n\nProcess now?`,
         )
       ) {
         try {
