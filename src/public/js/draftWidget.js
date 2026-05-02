@@ -108,17 +108,27 @@ function renderDraftList(drafts, keyword = "") {
     const activityName =
       activityMap[draft.activityId] || `Act #${draft.activityId}`;
 
+    let displayDate = draft.spentOn;
+    if (displayDate && displayDate.includes("-")) {
+      const [year, month, day] = displayDate.split("-");
+      displayDate = `${day}/${month}/${year}`;
+    }
+
     // Áp dụng highlight cho Subject, Activity và Ngày
     const highlightedSubject = highlightText(draft.subject, keyword);
     const highlightedActivity = highlightText(activityName, keyword);
-    const highlightedDate = highlightText(draft.spentOn, keyword);
+    const highlightedDate = highlightText(displayDate, keyword);
 
     div.innerHTML = `
-      <div style="display: flex; flex-direction: column;">
-        <span class="draft-title">${highlightedSubject}</span>
-        <span class="draft-meta">⏱ ${draft.hours}h | 🏷 ${highlightedActivity} | 📅 ${highlightedDate}</span>
+      <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 4px; padding-right: 12px;">
+        <div class="draft-title" style="white-space: normal; word-break: break-word; line-height: 1.4;">
+          ${highlightedSubject}
+        </div>
+        <div class="draft-meta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+          ⏱ ${draft.hours}h | 🏷 ${highlightedActivity} | 📅 ${highlightedDate}
+        </div>
       </div>
-      <button class="btn-del-draft" data-id="${draft._id}">&times;</button>
+      <button class="btn-del-draft" data-id="${draft._id}" style="flex-shrink: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">&times;</button>
     `;
 
     // Nút xóa

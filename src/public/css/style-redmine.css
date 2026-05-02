@@ -1032,10 +1032,10 @@ select.form-control[size] {
 .draft-item {
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-left: 4px solid #3b82f6; /* Viền xanh bên trái cho đẹp */
+  border-left: 4px solid #3b82f6;
   border-radius: 6px;
   padding: 10px;
-  cursor: grab; /* Biểu tượng bàn tay */
+  cursor: grab;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1047,19 +1047,26 @@ select.form-control[size] {
   cursor: grabbing;
 }
 
-/* Hiệu ứng khi thẻ đang được kéo lên không trung */
 .draft-item.dragging {
   opacity: 0.5;
   border: 1px dashed #3b82f6;
   transform: scale(0.98);
 }
 
+.draft-item > div:first-child {
+  display: flex;
+  align-items: baseline; /* Căn cho chân chữ của title và meta bằng nhau */
+  gap: 8px; /* Khoảng cách giữa title và meta (có thể tăng giảm tùy ý) */
+  flex-wrap: wrap; /* Cho phép rớt dòng nếu màn hình quá hẹp */
+}
+
 .draft-item .draft-title {
   font-weight: 600;
   color: #1e293b;
   font-size: 0.85rem;
-  margin-bottom: 3px;
+  margin-bottom: 0; /* XÓA BỎ margin-bottom cũ để không bị lệch chữ */
 }
+
 .draft-item .draft-meta {
   color: #64748b;
   font-size: 0.75rem;
@@ -1073,6 +1080,7 @@ select.form-control[size] {
   cursor: pointer;
   opacity: 0.5;
 }
+
 .btn-del-draft:hover {
   opacity: 1;
   transform: scale(1.1);
