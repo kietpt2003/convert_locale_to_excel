@@ -1,0 +1,254 @@
+/* Nền tối của Modal */
+.guide-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+}
+
+/* Hiển thị Modal */
+.guide-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Hộp Modal */
+.guide-modal {
+  background: #ffffff;
+  width: 1100px;
+  max-width: 95vw;
+  height: 750px;
+  border-radius: 16px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  overflow: hidden;
+  transform: translateY(20px);
+  transition: all 0.3s ease;
+}
+
+.guide-modal-overlay.active .guide-modal {
+  transform: translateY(0);
+}
+
+/* Cột Tab bên trái */
+.guide-sidebar {
+  width: 250px;
+  background: #f8fafc;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.guide-sidebar-header {
+  padding: 20px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.guide-tab-list {
+  list-style: none;
+  padding: 10px;
+  margin: 0;
+  overflow-y: auto;
+}
+
+.guide-tab-item {
+  padding: 12px 15px;
+  margin-bottom: 5px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #64748b;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.guide-tab-item:hover {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.guide-tab-item.active {
+  background: #eff6ff;
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* Cột Nội dung bên phải */
+.guide-content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.guide-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: 0.2s;
+}
+.guide-close-btn:hover {
+  color: #ef4444;
+}
+
+.guide-body {
+  flex: 1;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.guide-step-title {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #1e293b;
+  margin-bottom: 10px;
+}
+
+.guide-step-text {
+  color: #475569;
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.guide-step-img {
+  width: 100%;
+  max-height: 450px;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f1f5f9;
+  cursor: zoom-in;
+  transition: transform 0.2s;
+}
+
+.guide-step-img:hover {
+  transform: scale(1.01);
+  border-color: #3b82f6;
+}
+
+.guide-img-full-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10000; /* Nằm trên cả modal guide */
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  cursor: zoom-out; /* Bấm để thoát */
+}
+
+.guide-img-full-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.guide-img-full-overlay img {
+  max-width: 95%;
+  max-height: 95%;
+  object-fit: contain;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+}
+
+.guide-img-full-overlay.active img {
+  transform: scale(1);
+}
+
+.guide-img-full-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: white;
+  font-size: 40px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Footer & Controls */
+.guide-footer {
+  padding: 20px 40px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.guide-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.guide-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e0;
+  transition: 0.3s;
+}
+.guide-dot.active {
+  background: #3b82f6;
+  width: 16px;
+  border-radius: 4px;
+}
+
+.guide-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+  border: none;
+  font-size: 0.9rem;
+}
+
+.btn-back {
+  background: #f1f5f9;
+  color: #475569;
+}
+.btn-back:hover {
+  background: #e2e8f0;
+}
+
+.btn-next {
+  background: #3b82f6;
+  color: white;
+}
+.btn-next:hover {
+  background: #2563eb;
+}
+
+.btn-done {
+  background: #10b981;
+  color: white;
+}
+.btn-done:hover {
+  background: #059669;
+}
