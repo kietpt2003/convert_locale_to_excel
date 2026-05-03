@@ -159,6 +159,7 @@
               id="btnUpdateRedmineCreds"
               style="
                 width: 100%;
+                margin-top: 15px;
                 margin-bottom: 15px;
                 background: #edf2f7;
                 color: #2d3748;
@@ -168,7 +169,7 @@
               🔑 Update Redmine Login
             </button>
 
-            <label>Watched Projects</label>
+            <!-- <label>Watched Projects</label>
             <div class="project-list" id="projectList">
               <div class="empty-state">No projects loaded</div>
             </div>
@@ -185,19 +186,22 @@
 
             <button class="btn-save" id="btnSaveConfig">
               Save Preferences
-            </button>
+            </button> -->
           </div>
         </aside>
 
         <main>
           <div class="tab-navigation">
-            <button
+            <!-- <button
               class="tab-btn active"
               onclick="openTab(event, 'approval-tab')"
             >
               ⏳ Approvals
-            </button>
-            <button class="tab-btn" onclick="openTab(event, 'calendar-tab')">
+            </button> -->
+            <button
+              class="tab-btn active"
+              onclick="openTab(event, 'calendar-tab')"
+            >
               📅 Calendar
             </button>
             <button class="tab-btn" onclick="openTab(event, 'explorer-tab')">
@@ -214,7 +218,7 @@
             </button>
           </div>
 
-          <div id="approval-tab" class="tab-content active">
+          <!-- <div id="approval-tab" class="tab-content active">
             <div class="card">
               <div class="card-header flex-header">
                 <h3>⏳ Sub-task Approval</h3>
@@ -244,9 +248,9 @@
                 </table>
               </div>
             </div>
-          </div>
+          </div> -->
 
-          <div id="calendar-tab" class="tab-content">
+          <div id="calendar-tab" class="tab-content active">
             <div class="card calendar-card">
               <div class="card-header calendar-nav">
                 <div class="nav-left">
