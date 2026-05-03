@@ -1,5 +1,8 @@
 // =========================================================
 // 1. DỮ LIỆU HƯỚNG DẪN (Thêm/Sửa tab ở đây)
+
+import { initIdleHint } from "./idleHint.js";
+
 // =========================================================
 const GUIDE_DATA = [
   {
@@ -248,6 +251,7 @@ export function closeUserGuide() {
 // Bộc lộ hàm này ra ngoài luôn nếu bạn muốn mở Modal từ một nút bất kỳ khác bằng code
 export function openUserGuide() {
   if (!els.modal) return;
+  sessionStorage.setItem("userGuideOpened", "true");
   currentTabIndex = 0;
   currentStepIndex = 0;
   renderTabs();
@@ -279,6 +283,8 @@ export function initUserGuide() {
     console.warn("User Guide Modal không tồn tại trong DOM!");
     return;
   }
+
+  initIdleHint();
 
   // Gán Event Listeners
   els.btnPrev.onclick = handlePrev;
