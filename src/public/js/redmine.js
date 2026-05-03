@@ -174,9 +174,9 @@ export async function loadUserData() {
 
       document.getElementById("modalRedmineUrl").value =
         user?.redmineProfile?.redmineUrl || "";
-      document.getElementById("format").value =
-        user?.redmineProfile?.namingTemplate ||
-        "[PROJECT] | [PARENT] | Working";
+      // document.getElementById("format").value =
+      //   user?.redmineProfile?.namingTemplate ||
+      //   "[PROJECT] | [PARENT] | Working";
 
       document.getElementById("modalRedmineUsername").value =
         user?.redmineProfile?.login || "Anonymous user";
