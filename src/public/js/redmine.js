@@ -196,7 +196,7 @@ export async function loadUserData() {
 
       // Cố gắng gọi API lấy project. Nếu session chết hoặc chưa cấu hình,
       // fetchWithAuth sẽ tự động quăng lỗi và bật Modal!
-      await fetchRedmineProjects(user?.redmineProfile?.watchedProjectIds || []);
+      // await fetchRedmineProjects(user?.redmineProfile?.watchedProjectIds || []);
     }
   } catch (err) {
     console.error("Failed to load user data:", err);
