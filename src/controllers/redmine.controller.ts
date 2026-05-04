@@ -1533,3 +1533,99 @@ export const getProjectTaskTreeV2 = async (req: any, res: any) => {
     res.status(500).json({ message: "Failed to scrape projects/tasks HTML" });
   }
 };
+
+export const getScrapeFilters = async (req: any, res: any) => {
+  try {
+    const account = req.redmineAccount;
+
+    // Kiểm tra tài khoản Redmine đã được liên kết chưa
+    if (!account || !account.redmineUrl) {
+      return res.status(403).json({ message: "Please link your Redmine account." });
+    }
+
+    // 1. Tạo URL động dựa trên domain Redmine của user và gọi qua Interceptor
+    // res.fetchRedmine sẽ tự động nhúng Cookie/API Key vào request
+    const targetUrl = `${account.redmineUrl}/issues`;
+    const response = await res.fetchRedmine(targetUrl);
+    const htmlData = response.data;
+
+    // 2. Dùng Regex để tóm gọn biến JSON 'availableFilters' trong thẻ <script>
+    // Mẫu regex này sẽ tìm dòng bắt đầu bằng "var availableFilters = {" và kết thúc bằng "};"
+    const filterRegex = /var availableFilters = (\{.*?\});/;
+    const match = htmlData.match(filterRegex);
+
+    if (!match || !match[1]) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy cấu trúc filter trong HTML." });
+    }
+
+    // 3. Parse chuỗi bắt được thành Object JSON thực sự
+    const rawFilters = JSON.parse(match[1]);
+
+    // 4. Định dạng lại dữ liệu cho Frontend dễ sử dụng
+    const formattedFilters: any[] = [];
+    const trackers: any[] = [];
+
+    for (const key in rawFilters) {
+      const filterData = rawFilters[key];
+
+      // Xây dựng object filter chuẩn
+      const filterItem = {
+        id: key, // ví dụ: "status_id", "tracker_id", "subject"
+        name: filterData.name,
+        type: filterData.type,
+        options: [] as { id: string; name: string }[]
+      };
+
+      // Nếu filter này có danh sách giá trị đính kèm (vd: Tracker, Status, Priority)
+      if (filterData.values && Array.isArray(filterData.values)) {
+        filterItem.options = filterData.values.map((val: string[]) => ({
+          name: val[0], // Tên hiển thị (vd: "Bug", "Task", "New")
+          id: val[1]    // Giá trị ID (vd: "1", "5", "1")
+        }));
+
+        // Bóc tách riêng danh sách Tracker ra một mảng để xài cho Quick Drafts/Task Creation
+        if (key === 'tracker_id') {
+          trackers.push(...filterItem.options);
+        }
+      }
+
+      formattedFilters.push(filterItem);
+    }
+
+    // (Tùy chọn) Bóc tách thêm các Custom Queries (Các bộ lọc đã lưu sẵn bên thanh sidebar)
+    const $ = cheerio.load(htmlData);
+    const customQueries: any[] = [];
+    $('ul.queries li a.query').each((i: number, el: any) => {
+      const url = $(el).attr('href'); // vd: "/issues?query_id=53"
+      const name = $(el).text().trim();
+      //@ts-ignore
+      const queryId = new URLSearchParams(url.split('?')[1]).get('query_id');
+
+      if (queryId) {
+        customQueries.push({ id: queryId, name: name });
+      }
+    });
+
+    // 5. Trả về kết quả hoành tráng cho Frontend
+    res.json({
+      success: true,
+      data: {
+        allFilters: formattedFilters, // Dùng để build UI "Add filter" động
+        trackers: trackers,           // Dùng riêng cho chỗ chọn Tracker
+        customQueries: customQueries  // Các filter đã lưu (vd: Filter-260127, Issues assigned to me)
+      }
+    });
+
+  } catch (error: any) {
+    // 6. Xử lý lỗi đồng bộ với hệ thống
+    if (error.message === REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED) { // Hoặc thay bằng biến REDMINE_AUTHEN_ERROR.RE_LOGIN_FAILED nếu bạn có import
+      return res.status(401).json({ message: "Your Redmine login session has expired. Please log in again." });
+    }
+    if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) { // Hoặc REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
+    }
+
+    console.error("Scrape Filters Error:", error.message);
+    res.status(500).json({ success: false, message: "Lỗi khi trích xuất dữ liệu bộ lọc từ Redmine" });
+  }
+};

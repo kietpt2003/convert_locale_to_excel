@@ -2,6 +2,7 @@ import { fetchWithAuth } from "./redmine.js";
 
 let activityMap = {};
 let globalDrafts = [];
+window.globalTrackerMap = window.globalTrackerMap || { 5: "Task" };
 
 export async function initDraftWidget() {
   // Gán ngày mặc định là hôm nay (Sửa lỗi Timezone)
@@ -23,15 +24,18 @@ export async function initDraftWidget() {
       return;
     }
 
-    // Thuật toán tìm kiếm (Không phân biệt hoa thường, chứa nửa chữ cũng lấy)
+    // Thuật toán tìm kiếm
     const filteredDrafts = globalDrafts.filter((draft) => {
       const activityName =
         activityMap[draft.activityId] || `Act #${draft.activityId}`;
+      const trackerName =
+        window.globalTrackerMap[draft.trackerId] ||
+        `Tracker #${draft.trackerId || 5}`;
 
-      // Tìm trong Subject hoặc Activity Name hoặc Date
       return (
         draft.subject.toLowerCase().includes(keyword) ||
         activityName.toLowerCase().includes(keyword) ||
+        trackerName.toLowerCase().includes(keyword) ||
         draft.spentOn.includes(keyword)
       );
     });
@@ -39,6 +43,7 @@ export async function initDraftWidget() {
     renderDraftList(filteredDrafts, keyword);
   });
 
+  await loadQuickDraftTrackers();
   await loadActivities();
   await loadDrafts();
 }
@@ -75,15 +80,11 @@ export async function loadDrafts() {
 }
 
 function highlightText(text, keyword) {
-  if (!keyword) return text; // Không có chữ thì trả về nguyên gốc
+  if (!keyword) return text;
 
-  // Thoát (escape) các ký tự đặc biệt của Regex (vd: +, ?, *, [, ],...) để không bị văng lỗi khi gõ
   const safeKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-  // /gi nghĩa là: g = global (tìm tất cả), i = case-insensitive (không phân biệt hoa thường)
   const regex = new RegExp(`(${safeKeyword})`, "gi");
 
-  // Bọc phần text khớp bằng thẻ mark kèm chút CSS cho đẹp
   return text.replace(
     regex,
     '<mark style="background-color: #fef08a; border-radius: 2px; padding: 0 2px;">$1</mark>',
@@ -108,24 +109,33 @@ function renderDraftList(drafts, keyword = "") {
     const activityName =
       activityMap[draft.activityId] || `Act #${draft.activityId}`;
 
+    // Đã fix lỗi undefined Tracker Name ở đây:
+    const trackerName =
+      window.globalTrackerMap[draft.trackerId] ||
+      `Tracker #${draft.trackerId || 5}`;
+
     let displayDate = draft.spentOn;
     if (displayDate && displayDate.includes("-")) {
       const [year, month, day] = displayDate.split("-");
       displayDate = `${day}/${month}/${year}`;
     }
 
-    // Áp dụng highlight cho Subject, Activity và Ngày
+    // Áp dụng highlight
     const highlightedSubject = highlightText(draft.subject, keyword);
     const highlightedActivity = highlightText(activityName, keyword);
+    const highlightedTracker = highlightText(trackerName, keyword);
     const highlightedDate = highlightText(displayDate, keyword);
 
     div.innerHTML = `
-      <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 4px; padding-right: 12px;">
+      <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; gap: 6px; padding-right: 8px;">
         <div class="draft-title" style="white-space: normal; word-break: break-word; line-height: 1.4;">
           ${highlightedSubject}
         </div>
-        <div class="draft-meta" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-          ⏱ ${draft.hours}h | 🏷 ${highlightedActivity} | 📅 ${highlightedDate}
+        <div class="draft-meta" style="display: flex; flex-wrap: wrap; gap: 4px 8px;">
+          <span style="white-space: nowrap;">⏱ ${draft.hours}h</span>
+          <span style="white-space: nowrap;">🎯 ${highlightedTracker}</span>
+          <span style="white-space: nowrap;">🏷 ${highlightedActivity}</span>
+          <span style="white-space: nowrap;">📅 ${highlightedDate}</span>
         </div>
       </div>
       <button class="btn-del-draft" data-id="${draft._id}" style="flex-shrink: 0; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;">&times;</button>
@@ -152,6 +162,7 @@ async function handleAddDraft() {
   const hours = document.getElementById("draftHours").value;
   const spentOn = document.getElementById("draftDate").value;
   const activityId = document.getElementById("draftActivity").value;
+  const trackerId = document.getElementById("draftTrackerSelect").value;
 
   if (!subject || !hours || !activityId) {
     alert(
@@ -168,13 +179,13 @@ async function handleAddDraft() {
     const res = await fetchWithAuth("/api/redmine/drafts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ subject, hours, spentOn, activityId }),
+      body: JSON.stringify({ subject, hours, spentOn, activityId, trackerId }),
     });
 
     if (res.ok) {
-      document.getElementById("draftSubject").value = ""; // Clear input
+      document.getElementById("draftSubject").value = "";
       document.getElementById("draftHours").value = "";
-      await loadDrafts(); // Cập nhật lại UI
+      await loadDrafts();
     }
   } catch (error) {
     alert("Fail to create quick drafts.");
@@ -191,4 +202,49 @@ async function deleteDraft(id) {
   } catch (error) {
     console.error("Fail to delete drafts");
   }
+}
+
+async function loadQuickDraftTrackers() {
+  try {
+    const res = await fetchWithAuth("/api/redmine/scrape-filters");
+    const result = await res.json();
+
+    if (result.success && result.data && result.data.trackers) {
+      const trackers = result.data.trackers;
+
+      trackers.forEach((t) => {
+        window.globalTrackerMap[t.id] = t.name;
+      });
+
+      populateSelect("draftTrackerSelect", trackers, "5");
+    }
+  } catch (error) {
+    console.error("Lỗi khi tải danh sách Tracker cho Quick Drafts:", error);
+
+    const select = document.getElementById("draftTrackerSelect");
+    if (select && select.options.length === 1) {
+      select.innerHTML = '<option value="5">Task (Default)</option>';
+    }
+  }
+}
+
+// Bổ sung hàm populateSelect vào nội bộ file này để tránh lỗi ReferenceError
+function populateSelect(
+  elementId,
+  optionsArray,
+  defaultVal = "",
+  placeholder = null,
+) {
+  const select = document.getElementById(elementId);
+  if (!select) return;
+
+  select.innerHTML = "";
+  if (placeholder) {
+    select.add(new Option(placeholder, ""));
+  }
+  optionsArray.forEach((opt) => {
+    // Đảm bảo so sánh kiểu string cho chuẩn xác
+    const isSelected = String(opt.id) === String(defaultVal);
+    select.add(new Option(opt.name, opt.id, isSelected, isSelected));
+  });
 }

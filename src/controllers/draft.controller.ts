@@ -1,8 +1,9 @@
 import { Response } from 'express';
+import axios from 'axios';
+
 import { WorkDraft } from '../models/WorkDraft.js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
-import { WORK_DRAFT_STATUS } from '../constants/redmine.js';
-import axios from 'axios';
+import { REDMINE_TASK_TRACKER_ID, WORK_DRAFT_STATUS } from '../constants/redmine.js';
 
 // 1. LẤY DANH SÁCH BẢN NHÁP (Chưa xử lý)
 export const getDrafts = async (req: any, res: Response) => {
@@ -71,7 +72,7 @@ export const deleteDraft = async (req: any, res: Response) => {
 
 export const executeDraftMatch = async (req: any, res: Response) => {
   try {
-    const { draftId, parentTaskId, projectId, activityId } = req.body;
+    const { draftId, parentTaskId, projectId, activityId, trackerId } = req.body;
     const account = req.redmineAccount; // Lấy từ redmineInterceptor
 
     if (!account || !account.redmineUrl || !account.redmineApiKey) {
@@ -90,7 +91,8 @@ export const executeDraftMatch = async (req: any, res: Response) => {
         project_id: projectId,
         subject: draft.subject,
         parent_issue_id: parentTaskId,
-        assigned_to_id: 'me' // Tự động gán cho chính mình
+        assigned_to_id: 'me', // Tự động gán cho chính mình
+        trackerId: trackerId || REDMINE_TASK_TRACKER_ID.TASK.key
       }
     };
 

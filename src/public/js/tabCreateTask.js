@@ -139,7 +139,7 @@ async function loadProjectOptions(projectId) {
 }
 
 // Helper: Đổ dữ liệu vào thẻ Select
-function populateSelect(
+export function populateSelect(
   elementId,
   optionsArray,
   defaultVal = "",
