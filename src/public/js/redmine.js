@@ -53,7 +53,7 @@ export async function fetchWithAuth(url, options = {}) {
         throw new Error("REDMINE_AUTH_REQUIRED"); // Cắt đứt luồng chạy hiện tại
       } else {
         // Lỗi JWT token hệ thống hết hạn -> Văng ra màn hình đăng nhập chính
-        localStorage.removeItem("app_token");
+        // localStorage.removeItem("app_token");
         // window.location.replace("/index.html");
       }
     } catch (e) {
