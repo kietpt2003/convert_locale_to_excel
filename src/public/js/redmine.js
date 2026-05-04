@@ -53,8 +53,8 @@ export async function fetchWithAuth(url, options = {}) {
         throw new Error("REDMINE_AUTH_REQUIRED"); // Cắt đứt luồng chạy hiện tại
       } else {
         // Lỗi JWT token hệ thống hết hạn -> Văng ra màn hình đăng nhập chính
-        // localStorage.removeItem("app_token");
-        // window.location.replace("/index.html");
+        localStorage.removeItem("app_token");
+        window.location.replace("/index.html");
       }
     } catch (e) {
       if (e.message !== "REDMINE_AUTH_REQUIRED") {
@@ -144,21 +144,9 @@ export async function initApp() {
     btnSave.addEventListener("click", saveRedmineConfig);
   }
 
-  initGlobalTooltip();
-  initQuickSelectors();
-  initQuickModalEvents();
-  initDraftWidget();
-  initUserGuide();
-
   document.getElementById("prevMonth").onclick = () => changeMonth(-1);
   document.getElementById("nextMonth").onclick = () => changeMonth(1);
   document.getElementById("btnToday").onclick = () => goToToday();
-
-  try {
-    await renderCalendar();
-  } catch (e) {
-    // Bỏ qua, Modal login đã bật rồi
-  }
 }
 
 // 1. Load configuration from MongoDB
@@ -197,6 +185,17 @@ export async function loadUserData() {
       // Cố gắng gọi API lấy project. Nếu session chết hoặc chưa cấu hình,
       // fetchWithAuth sẽ tự động quăng lỗi và bật Modal!
       // await fetchRedmineProjects(user?.redmineProfile?.watchedProjectIds || []);
+      initGlobalTooltip();
+      initQuickSelectors();
+      initQuickModalEvents();
+      initDraftWidget();
+      initUserGuide();
+
+      try {
+        await renderCalendar();
+      } catch (e) {
+        // Bỏ qua, Modal login đã bật rồi
+      }
     }
   } catch (err) {
     console.error("Failed to load user data:", err);
