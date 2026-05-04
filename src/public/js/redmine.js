@@ -54,7 +54,7 @@ export async function fetchWithAuth(url, options = {}) {
       } else {
         // Lỗi JWT token hệ thống hết hạn -> Văng ra màn hình đăng nhập chính
         localStorage.removeItem("app_token");
-        window.location.replace("/index.html");
+        // window.location.replace("/index.html");
       }
     } catch (e) {
       if (e.message !== "REDMINE_AUTH_REQUIRED") {
