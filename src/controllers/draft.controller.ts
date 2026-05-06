@@ -92,7 +92,7 @@ export const executeDraftMatch = async (req: any, res: Response) => {
         subject: draft.subject,
         parent_issue_id: parentTaskId,
         assigned_to_id: 'me', // Tự động gán cho chính mình
-        trackerId: trackerId || REDMINE_TASK_TRACKER_ID.TASK.key
+        tracker_id: trackerId || REDMINE_TASK_TRACKER_ID.TASK.key
       }
     };
 

@@ -599,6 +599,7 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
               parentTaskId: parentTaskId,
               projectId: projectId,
               activityId: draftData.activityId,
+              trackerId: draftData.trackerId,
             }),
           });
 
