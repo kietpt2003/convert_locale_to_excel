@@ -325,7 +325,7 @@ app.post("/v2/upload-excel", verifyToken, async (req: Request, res: Response) =>
     const jsContent = generateJsFile(result);
     const jsBuffer = Buffer.from(jsContent, "utf-8");
 
-    const blob = await put("en.js", jsBuffer, {
+    const blob = await put("locale.js", jsBuffer, {
       access: "public",
       token: process.env.BLOB_READ_WRITE_TOKEN,
       allowOverwrite: true
