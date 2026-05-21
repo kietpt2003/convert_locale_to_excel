@@ -33,17 +33,35 @@ function showStatus(message, type) {
 function parseInput() {
   const raw = inputArea.value.trim();
   if (!raw) {
-    showStatus("⚠️ Vui lòng nhập JSON vào ô bên trái.", "error");
+    showStatus("⚠️ Paste in JSON or JS Object into left box.", "error");
     return null;
   }
+
+  let obj = null;
+
   try {
-    const obj = JSON.parse(raw);
+    obj = JSON.parse(raw);
     statusBox.style.display = "none";
     return obj;
-  } catch (err) {
-    showStatus(`❌ Lỗi Cú Pháp JSON:\n${err.message}`, "error");
-    outputArea.value = "";
-    return null;
+  } catch (jsonErr) {
+    try {
+      const jsEval = new Function(`return (${raw});`);
+      obj = jsEval();
+
+      if (obj !== null && typeof obj === "object") {
+        statusBox.style.display = "none";
+
+        return obj;
+      } else {
+        throw new Error(
+          "Input evaluates to a primitive value, not an object/array.",
+        );
+      }
+    } catch (jsErr) {
+      showStatus(`❌ Syntax error:\n${jsonErr.message}`, "error");
+      outputArea.innerHTML = "";
+      return null;
+    }
   }
 }
 
