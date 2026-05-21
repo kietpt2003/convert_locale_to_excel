@@ -6,7 +6,7 @@ import {
   initGlobalTooltip,
 } from "./calendar.js";
 import { debounce } from "./debounce.js";
-import { initDraftWidget } from "./draftWidget.js";
+import { initDraftWidget, loadDrafts } from "./draftWidget.js";
 import {
   initQuickModalEvents,
   openQuickLogTime,
@@ -613,7 +613,9 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
             const draftEl = document.querySelector(
               `.draft-item .btn-del-draft[data-id="${draftData._id}"]`,
             );
+
             if (draftEl) draftEl.closest(".draft-item").remove();
+            loadDrafts();
 
             const container = document.getElementById("projectTreeContainer");
             container.innerHTML =
