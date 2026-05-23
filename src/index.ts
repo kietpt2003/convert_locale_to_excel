@@ -1132,9 +1132,9 @@ app.use('/api/redmine', redmineRoutes);
 
 app.use(express.static(path.resolve('src/public')));
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
 
 const io = new Server(server, {
   cors: {
@@ -1156,8 +1156,8 @@ io.on('connection', (socket) => {
   });
 });
 
-server.listen(3001, () => {
-  console.log('🚀 Socket server đang chạy!');
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
 
 export default app;
