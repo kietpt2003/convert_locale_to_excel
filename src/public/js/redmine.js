@@ -617,11 +617,21 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
             if (draftEl) draftEl.closest(".draft-item").remove();
             loadDrafts();
 
-            const container = document.getElementById("projectTreeContainer");
-            container.innerHTML =
-              '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Retrieving the latest data from Redmine...</div>';
+            const newTask = result.data.newTask;
 
-            loadFullProjectTree(true); // Done need to wait for this process to finish
+            if (!task.subtasks) task.subtasks = [];
+
+            task.subtasks.unshift(newTask);
+
+            if (typeof executeLocalSearch === "function") {
+              executeLocalSearch();
+            }
+
+            // const container = document.getElementById("projectTreeContainer");
+            // container.innerHTML =
+            //   '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Retrieving the latest data from Redmine...</div>';
+
+            // loadFullProjectTree(true); // Done need to wait for this process to finish
           } else {
             alert(`❌ Error: ${result.message}`);
           }

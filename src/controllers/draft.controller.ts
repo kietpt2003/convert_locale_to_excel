@@ -76,13 +76,13 @@ export const executeDraftMatch = async (req: any, res: Response) => {
     const account = req.redmineAccount; // Lấy từ redmineInterceptor
 
     if (!account || !account.redmineUrl || !account.redmineApiKey) {
-      return res.status(403).json({ success: false, message: "Chưa liên kết tài khoản Redmine." });
+      return res.status(403).json({ success: false, message: "Redmine account not linked yet." });
     }
 
     // 1. Tìm bản nháp trong Database
     const draft = await WorkDraft.findById(draftId);
     if (!draft) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy bản nháp. Có thể đã bị xóa." });
+      return res.status(404).json({ success: false, message: "Draft not found." });
     }
 
     // 2. GỌI API REDMINE: TẠO TASK CON
@@ -102,8 +102,9 @@ export const executeDraftMatch = async (req: any, res: Response) => {
       { headers: { 'X-Redmine-API-Key': account.redmineApiKey, 'Content-Type': 'application/json' } }
     );
 
+    const createdIssue = createRes.data.issue;
     const newTaskId = createRes.data.issue.id;
-    console.log(`✅ [Auto-log] Đã tạo Task con thành công: #${newTaskId}`);
+    console.log(`✅ [Auto-log] Create task success: #${newTaskId}`);
 
     // 3. GỌI API REDMINE: LOG TIME VÀO TASK VỪA TẠO
     const logTimePayload: any = {
@@ -126,15 +127,24 @@ export const executeDraftMatch = async (req: any, res: Response) => {
       logTimePayload,
       { headers: { 'X-Redmine-API-Key': account.redmineApiKey, 'Content-Type': 'application/json' } }
     );
-    console.log(`✅ [Auto-log] Đã log ${draft.hours}h vào Task #${newTaskId}`);
+    console.log(`✅ [Auto-log] Done log ${draft.hours}h for Task #${newTaskId}`);
 
     // 4. XÓA BẢN NHÁP (Dọn dẹp)
     await WorkDraft.findByIdAndDelete(draftId);
 
+    const newTaskForUI = {
+      ...createdIssue,
+      spent_hours: draft.hours,
+      subtasks: []
+    };
+
     res.json({
       success: true,
-      message: "Hoàn tất! Đã tạo task và log time.",
-      data: { newTaskId: newTaskId }
+      message: "Done create task and log time.",
+      data: {
+        newTaskId: newTaskId,
+        newTask: newTaskForUI
+      }
     });
 
   } catch (error: any) {
