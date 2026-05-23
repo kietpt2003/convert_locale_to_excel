@@ -133,9 +133,19 @@ function renderJSON(val, key = null) {
     } else if (typeof val === "number") {
       valSpan.className = "json-number";
       valSpan.innerText = val;
-    } else {
+    } else if (typeof val === "boolean") {
       valSpan.className = "json-boolean";
       valSpan.innerText = val;
+    } else if (val === null) {
+      valSpan.className = "json-null";
+      valSpan.innerText = "null";
+      valSpan.style.color = "#ef4444"; // Đỏ nhạt cho null
+      valSpan.style.fontWeight = "bold";
+    } else if (typeof val === "undefined") {
+      valSpan.className = "json-undefined";
+      valSpan.innerText = "undefined";
+      valSpan.style.color = "#94a3b8"; // Xám cho undefined
+      valSpan.style.fontStyle = "italic";
     }
     container.appendChild(valSpan);
   }
@@ -166,7 +176,7 @@ function performSearch() {
   searchMatches = [];
   // Quét qua các span chứa nội dung giá trị để highlight (nhanh hơn quét toàn bộ tree)
   const targets = outputArea.querySelectorAll(
-    ".json-string, .json-key, .json-number, .json-boolean",
+    ".json-string, .json-key, .json-number, .json-boolean, .json-null, .json-undefined",
   );
 
   targets.forEach((node) => {
@@ -323,7 +333,8 @@ tsGenBtn.addEventListener("click", () => {
   const interfaceNames = new Set();
 
   function getType(value, keyName) {
-    if (value === null) return "any";
+    if (value === null) return "null";
+    if (typeof value === "undefined") return "undefined";
     const type = typeof value;
 
     if (type === "string" || type === "number" || type === "boolean") {
