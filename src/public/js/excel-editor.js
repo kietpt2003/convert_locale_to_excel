@@ -265,7 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("✅ Import thành công và đã cập nhật Preview");
       } catch (error) {
         console.error("Lỗi khi import:", error);
-        alert("Có lỗi xảy ra khi đọc file Excel.");
+        alert("An error occurred while reading the Excel file.");
       }
     };
     reader.readAsBinaryString(file);

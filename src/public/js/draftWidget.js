@@ -219,7 +219,7 @@ async function loadQuickDraftTrackers() {
       populateSelect("draftTrackerSelect", trackers, "5");
     }
   } catch (error) {
-    console.error("Lỗi khi tải danh sách Tracker cho Quick Drafts:", error);
+    console.error("Error loading Tracker list for Quick Drafts:", error);
 
     const select = document.getElementById("draftTrackerSelect");
     if (select && select.options.length === 1) {

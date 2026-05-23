@@ -167,7 +167,7 @@ export async function loadUserData() {
       //   "[PROJECT] | [PARENT] | Working";
 
       document.getElementById("modalRedmineUsername").value =
-        user?.redmineProfile?.login || "Anonymous user";
+        user?.redmineProfile?.login || "yourname@estuary.solutions";
       document.getElementById("modalRedminePassword").value =
         user?.redmineProfile?.password || "";
 

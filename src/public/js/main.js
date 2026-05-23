@@ -126,7 +126,7 @@ function updateUserInfoUI() {
         const role = e.target.role.value;
         const btn = document.getElementById("btn-add-user");
 
-        btn.textContent = "Đang thêm...";
+        btn.textContent = "Adding...";
         btn.disabled = true;
 
         try {

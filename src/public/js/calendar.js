@@ -21,7 +21,7 @@ export async function renderCalendar() {
   const monthName = currentViewDate.toLocaleString("en-US", { month: "long" });
 
   monthLabel.innerText = `${monthName}, ${year}`;
-  grid.innerHTML = '<div style="padding: 20px;">Loading data...</div>';
+  grid.innerHTML = `<div style="padding: 20px; white-space: nowrap; grid-column: 1 / -1; text-align: center; color: #64748b;">Loading data...</div>`;
 
   try {
     const token = localStorage.getItem("app_token");

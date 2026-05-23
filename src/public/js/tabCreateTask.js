@@ -134,7 +134,7 @@ async function loadProjectOptions(projectId) {
     }
   } catch (error) {
     console.error("Lỗi lấy option tạo task", error);
-    alert("Không thể tải cấu hình form của dự án này.");
+    alert("Unable to load the form configuration for this project.");
   }
 }
 

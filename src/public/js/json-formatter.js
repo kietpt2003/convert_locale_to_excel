@@ -270,7 +270,7 @@ formatBtn.addEventListener("click", () => {
     outputArea.innerHTML = "";
     outputArea.appendChild(renderJSON(obj));
     searchBar.style.display = "flex";
-    showStatus("✅ Render JSON thành công!", "success");
+    showStatus("✅ Render JSON success!", "success");
   }
 });
 
@@ -286,13 +286,13 @@ minifyBtn.addEventListener("click", () => {
     `;
 
     searchBar.style.display = "flex";
-    showStatus("✅ Đã nén JSON thành 1 dòng!", "success");
+    showStatus("✅ JSON compressed into a single line!", "success");
   }
 });
 
 copyBtn.addEventListener("click", () => {
   if (!currentRawJson) {
-    showStatus("⚠️ Không có dữ liệu để copy!", "error");
+    showStatus("⚠️ There is no data to copy!", "error");
     return;
   }
 
@@ -318,10 +318,10 @@ copyBtn.addEventListener("click", () => {
         copyBtn.style.borderColor = "";
       }, 2000);
 
-      showStatus("📋 Đã copy JSON sạch vào bộ nhớ tạm!", "success");
+      showStatus("📋 Clean JSON has been copied to the clipboard!", "success");
     })
     .catch((err) => {
-      showStatus("❌ Lỗi khi copy: " + err, "error");
+      showStatus("❌ Failed to copy: " + err, "error");
     });
 });
 
@@ -379,7 +379,7 @@ tsGenBtn.addEventListener("click", () => {
   getType(obj, "RootObject");
 
   outputArea.value = tsInterfaces.trim();
-  showStatus("🪄 Đã hô biến JSON thành TypeScript Interfaces!", "success");
+  showStatus("🪄 I've transformed JSON into TypeScript Interfaces!", "success");
 });
 
 let isDarkMode = false;

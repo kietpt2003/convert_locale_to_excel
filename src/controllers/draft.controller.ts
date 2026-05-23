@@ -153,7 +153,7 @@ export const executeDraftMatch = async (req: any, res: Response) => {
     // Bắt lỗi cụ thể từ Redmine để báo cho UI
     const errorMsg = error.response?.data?.errors
       ? error.response.data.errors.join(', ')
-      : "Lỗi hệ thống khi kết nối với Redmine.";
+      : "System error when connecting to Redmine.";
 
     res.status(500).json({ success: false, message: errorMsg });
   }

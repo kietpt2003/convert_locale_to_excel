@@ -869,11 +869,11 @@ export const getUsersFromReportHTML = async (req: any, res: any) => {
     }
 
     if (error.message === REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED) {
-      return res.status(403).json({ message: "Bạn chưa thiết lập tài khoản Redmine." });
+      return res.status(403).json({ message: "You haven't set up a Redmine account yet." });
     }
 
     console.error("Scrape User Error:", error.message);
-    res.status(500).json({ message: "Lỗi khi bóc tách danh sách user từ HTML" });
+    res.status(500).json({ message: "Error when extracting user list from HTML" });
   }
 };
 
@@ -884,7 +884,7 @@ export const getNewTaskOptions = async (req: any, res: any) => {
     const account = req.redmineAccount; // Đã được middleware gán vào
 
     if (!account || !account.redmineUrl) {
-      return res.status(403).json({ message: "Vui lòng liên kết tài khoản Redmine." });
+      return res.status(403).json({ message: "Please link your Redmine account." });
     }
 
     // 1. Dựng URL có chứa đầy đủ param để Redmine render form chuẩn xác nhất
@@ -959,7 +959,7 @@ export const getNewTaskOptions = async (req: any, res: any) => {
     }
 
     console.error("Fetch Task Options Error:", error.message);
-    res.status(500).json({ message: "Lỗi khi lấy dữ liệu form tạo task" });
+    res.status(500).json({ message: "Error retrieving form data to create a task." });
   }
 };
 
@@ -1240,13 +1240,13 @@ export const generateSpentTimeReport = async (req: any, res: any) => {
     const account = req.redmineAccount;
 
     if (!account || !account.redmineUrl) {
-      return res.status(403).json({ message: "Vui lòng liên kết tài khoản Redmine." });
+      return res.status(403).json({ message: "Please link your Redmine account." });
     }
 
     // Lấy nguyên cục Query String từ URL của request hiện tại (Tất cả sau dấu ?)
     const queryString = req.originalUrl.substring(req.originalUrl.indexOf('?'));
     if (!queryString || queryString === req.originalUrl) {
-      return res.status(400).json({ message: "Thiếu tham số filter báo cáo" });
+      return res.status(400).json({ message: "Missing report filter parameters." });
     }
 
     // Ghép URL gọi thẳng lên trang Báo cáo của Redmine
@@ -1301,7 +1301,7 @@ export const generateSpentTimeReport = async (req: any, res: any) => {
     }
 
     console.error("Generate Report Error:", error.message);
-    res.status(500).json({ message: "Lỗi khi trích xuất dữ liệu bảng báo cáo từ Redmine" });
+    res.status(500).json({ message: "Error when extracting report data from Redmine" });
   }
 };
 
@@ -1424,7 +1424,7 @@ export const getProjectTaskTreeV2 = async (req: any, res: any) => {
         }
 
       } catch (err: any) {
-        console.error(`Lỗi cào project ${projectIdentifier} page 1:`, err.message);
+        console.error(`Error scraping project ${projectIdentifier} page 1:`, err.message);
       }
     };
 
@@ -1555,7 +1555,7 @@ export const getScrapeFilters = async (req: any, res: any) => {
     const match = htmlData.match(filterRegex);
 
     if (!match || !match[1]) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy cấu trúc filter trong HTML." });
+      return res.status(404).json({ success: false, message: "No filter structure found in HTML." });
     }
 
     // 3. Parse chuỗi bắt được thành Object JSON thực sự
@@ -1626,6 +1626,6 @@ export const getScrapeFilters = async (req: any, res: any) => {
     }
 
     console.error("Scrape Filters Error:", error.message);
-    res.status(500).json({ success: false, message: "Lỗi khi trích xuất dữ liệu bộ lọc từ Redmine" });
+    res.status(500).json({ success: false, message: "Error extracting filter data from Redmine." });
   }
 };

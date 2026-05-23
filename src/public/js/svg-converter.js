@@ -49,7 +49,7 @@ function analyzeAndNormalizeSvg(svgString) {
     if (isFakeSvg) {
       // Hiện báo động đỏ
       showStatus(
-        "🚨 FAKE SVG DETECTED! File này chứa ảnh tĩnh (PNG/JPG) bị Designer nhúng vào bên trong. Không thể sử dụng thuộc tính currentColor. Hãy yêu cầu Designer vẽ lại và xuất lại Vector chuẩn!",
+        "🚨 FAKE SVG DETECTED! This file contains static images (PNG/JPG) embedded by the designer. The `currentColor` property cannot be used. Please ask the designer to redraw and export a standard vector!",
         "error",
       );
       outputTextArea.value = svgString;
@@ -84,7 +84,7 @@ function analyzeAndNormalizeSvg(svgString) {
       // Nếu không có viewBox, RN sẽ bị lỗi, ta cần báo lỗi hoặc tính toán thêm.
       // Tạm thời tool sẽ cảnh báo
       showStatus(
-        "⚠️ SVG này thiếu viewBox! react-native-svg có thể render sai kích thước.",
+        "⚠️ This SVG is missing a viewBox! react-native-svg may render at the wrong size.",
         "error",
       );
     }
@@ -94,7 +94,7 @@ function analyzeAndNormalizeSvg(svgString) {
     // Hiển thị kết quả
     outputTextArea.value = cleanSvg;
     showStatus(
-      "✅ Chuẩn hóa SVG thành công! Mã màu cứng đã được chuyển sang currentColor.",
+      "✅ SVG normalization successful! Hardcoded colors have been converted to currentColor.",
       "success",
     );
     updatePreview(cleanSvg);
@@ -118,7 +118,7 @@ function analyzeAndNormalizeSvg(svgString) {
 //   );
 
 //   if (!match || !match[1]) {
-//     showStatus("❌ Lỗi: Không thể tìm thấy dữ liệu ảnh để tự đồ nét.", "error");
+//     showStatus("❌ Error: No image data found for auto-focusing.", "error");
 //     traceBtn.innerText = "🪄 Magical Trace (Fake SVG → Vector)";
 //     traceBtn.disabled = false;
 //     analyzeBtn.disabled = false;
@@ -158,7 +158,7 @@ function analyzeAndNormalizeSvg(svgString) {
 //       // Hiển thị kết quả đồ nét
 //       outputTextArea.value = finalTracedSvg;
 //       showStatus(
-//         '✨ Phép thuật thành công! Ảnh fake đã được "đồ" lại thành Vector. Key này hiện có thể đổi màu Prop fill/currentColor.',
+//         '✨ Magic successful! The fake image has been "recreated" into a vector. This key can now change the Prop fill/currentColor.',
 //         "success",
 //       );
 //       updatePreview(finalTracedSvg);
@@ -187,7 +187,7 @@ function traceEmbeddedImage() {
   );
 
   if (!match || !match[1]) {
-    showStatus("❌ Lỗi: Không thể tìm thấy dữ liệu ảnh để tự đồ nét.", "error");
+    showStatus("❌ Error: No image data found for auto-focusing.", "error");
     traceBtn.innerText = "🪄 Magical Trace (Fake SVG → Vector)";
     traceBtn.disabled = false;
     analyzeBtn.disabled = false;
@@ -249,7 +249,7 @@ function traceEmbeddedImage() {
       // Hiển thị kết quả
       outputTextArea.value = finalTracedSvg;
       showStatus(
-        '✨ Phép thuật thành công! Ảnh fake đã được dọn sạch nền và "đồ" lại thành Vector mượt mà.',
+        "✨ Magic successful! The fake image has had its background cleaned and retouched into a smooth vector.",
         "success",
       );
 
