@@ -1,4 +1,5 @@
 import { initChatAgent } from "./chat-agent.js";
+import { initChatWidget } from "./chatWidget.js";
 
 let authToken = localStorage.getItem("app_token");
 
@@ -79,7 +80,7 @@ export function signOut() {
   }
 }
 
-function parseJwt(token) {
+export function parseJwt(token) {
   try {
     const base64Url = token.split(".")[1];
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
@@ -149,6 +150,8 @@ function updateUserInfoUI() {
         }
       };
     }
+
+    initChatWidget(user);
   }
 }
 

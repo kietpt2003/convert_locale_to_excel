@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Realtime Chat với Render Socket</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 500px;
+        margin: 50px auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+      }
+      #chat-box {
+        height: 300px;
+        border: 1px solid #eee;
+        padding: 10px;
+        overflow-y: auto;
+        margin-bottom: 10px;
+        background: #f9f9f9;
+      }
+      .msg {
+        margin-bottom: 8px;
+        padding: 5px 10px;
+        background: #e2e8f0;
+        border-radius: 5px;
+        display: inline-block;
+        clear: both;
+        float: left;
+        width: fit-content;
+      }
+      .msg.my-msg {
+        background: #3b82f6;
+        color: white;
+        float: right;
+      }
+      .input-group {
+        display: flex;
+        gap: 5px;
+        margin-bottom: 10px;
+      }
+      input {
+        flex: 1;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+      }
+      button {
+        padding: 8px 15px;
+        background: #16a34a;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #15803d;
+      }
+      #status {
+        font-size: 0.85em;
+        color: #64748b;
+        margin-bottom: 10px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <h2 style="text-align: center; margin-top: 0">Khung Chat Ẩn Danh</h2>
+
+    <div id="status">
+      🔴 Đang kết nối... (Có thể mất 30s nếu server đang ngủ)
+    </div>
+
+    <div id="chat-box"></div>
+
+    <div class="input-group">
+      <input
+        type="text"
+        id="username"
+        placeholder="Nhập tên của bạn..."
+        style="flex: 0.4"
+      />
+    </div>
+    <div class="input-group">
+      <input
+        type="text"
+        id="message"
+        placeholder="Nhập tin nhắn..."
+        autocomplete="off"
+      />
+      <button onclick="sendMessage()">Gửi</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+
+    <script>
+      // ==========================================
+      // 2. KHỞI TẠO KẾT NỐI ĐẾN SERVER RENDER CỦA BẠN
+      // ==========================================
+      // LƯU Ý: Sửa lại đường dẫn này thành URL app trên Render của bạn!
+      const SERVER_URL = "https://convert-locale-to-excel.onrender.com";
+
+      const socket = io(SERVER_URL);
+
+      // DOM Elements
+      const statusDiv = document.getElementById("status");
+      const chatBox = document.getElementById("chat-box");
+      const nameInput = document.getElementById("username");
+      const msgInput = document.getElementById("message");
+
+      // ==========================================
+      // 3. LẮNG NGHE CÁC SỰ KIỆN TỪ SERVER
+      // ==========================================
+
+      // Khi kết nối thành công
+      socket.on("connect", () => {
+        statusDiv.innerHTML = "🟢 Đã kết nối thành công!";
+        statusDiv.style.color = "#16a34a";
+      });
+
+      // Khi mất kết nối
+      socket.on("disconnect", () => {
+        statusDiv.innerHTML = "🔴 Mất kết nối tới server!";
+        statusDiv.style.color = "#dc2626";
+      });
+
+      // Khi nhận được tin nhắn từ server (Event: 'receive_message')
+      socket.on("receive_message", (data) => {
+        const isMyMsg = data.user === nameInput.value && nameInput.value !== "";
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = `msg ${isMyMsg ? "my-msg" : ""}`;
+        msgDiv.innerHTML = `<strong>${data.user}:</strong> ${data.text}`;
+
+        // Thêm tin nhắn vào khung chat
+        chatBox.appendChild(msgDiv);
+
+        // Cuộn xuống dòng mới nhất
+        chatBox.scrollTop = chatBox.scrollHeight;
+      });
+
+      // ==========================================
+      // 4. GỬI TIN NHẮN LÊN SERVER
+      // ==========================================
+      function sendMessage() {
+        const user = nameInput.value.trim() || "Ẩn danh";
+        const text = msgInput.value.trim();
+
+        if (!text) return; // Không gửi nếu tin nhắn trống
+
+        const payload = {
+          user: user,
+          text: text,
+        };
+
+        // Phát sự kiện 'send_message' lên server
+        socket.emit("send_message", payload);
+
+        // Xóa nội dung ô input sau khi gửi
+        msgInput.value = "";
+        msgInput.focus();
+      }
+
+      // Gửi tin nhắn khi bấm phím Enter
+      msgInput.addEventListener("keypress", function (event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+    </script>
+  </body>
+</html>

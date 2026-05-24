@@ -6,6 +6,8 @@
     <title>Redmine Automation Tool</title>
     <link rel="stylesheet" href="/css/style-redmine.css" />
     <link rel="stylesheet" href="/css/style-user-guide.css" />
+    <link rel="stylesheet" href="/css/style-chat-widget.css" />
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   </head>
   <body>
     <div class="container">
@@ -949,6 +951,69 @@
     <div id="guideImgFullOverlay" class="guide-img-full-overlay">
       <span class="guide-img-full-close">&times;</span>
       <img id="guideImgFull" src="" alt="Full Screen" />
+    </div>
+
+    <div id="fb-chat-widget">
+      <div class="chat-header" id="chatHeaderToggle">
+        <div style="display: flex; align-items: center; width: 100%">
+          <div class="online-dot" style="margin-right: 8px"></div>
+          <span id="chatTitle" style="font-weight: bold; font-size: 15px"
+            >Team Chat</span
+          >
+          <span class="chat-toggle-icon">▼</span>
+        </div>
+      </div>
+
+      <div class="chat-body-split">
+        <div class="online-users-panel" id="onlineUsersList">
+          <div class="user-item active" data-email="ALL">
+            <div class="user-item-avatar">🌍</div>
+            <div class="user-item-name">Team Chat</div>
+          </div>
+        </div>
+
+        <div class="chat-main-area">
+          <div id="chatBoxContainer">
+            <div
+              style="
+                text-align: center;
+                color: #94a3b8;
+                font-size: 12px;
+                margin-top: 10px;
+              "
+            >
+              Start of conversation
+            </div>
+          </div>
+
+          <div class="chat-footer">
+            <div id="replyPreviewContainer" style="display: none">
+              <div class="reply-line"></div>
+              <div id="replyPreviewText" class="reply-text">Replying...</div>
+              <button id="btnCancelReply">&times;</button>
+            </div>
+
+            <div class="chat-input-area">
+              <input
+                type="text"
+                id="chatMessageInput"
+                placeholder="Aa"
+                autocomplete="off"
+              />
+              <button id="btnSendChat">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script type="module">

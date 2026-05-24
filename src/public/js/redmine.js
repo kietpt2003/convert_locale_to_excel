@@ -5,8 +5,10 @@ import {
   initQuickSelectors,
   initGlobalTooltip,
 } from "./calendar.js";
+import { initChatWidget } from "./chatWidget.js";
 import { debounce } from "./debounce.js";
 import { initDraftWidget, loadDrafts } from "./draftWidget.js";
+import { parseJwt } from "./main.js";
 import {
   initQuickModalEvents,
   openQuickLogTime,
@@ -190,6 +192,11 @@ export async function loadUserData() {
       initQuickModalEvents();
       initDraftWidget();
       initUserGuide();
+
+      const authData = parseJwt(token);
+      if (authData) {
+        initChatWidget(authData);
+      }
 
       try {
         await renderCalendar();
