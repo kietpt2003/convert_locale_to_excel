@@ -15,8 +15,6 @@ import jwt from "jsonwebtoken";
 import translate from "translate-google";
 import { isHtml } from "cheerio/utils";
 import { createClient } from "redis";
-import { Server } from 'socket.io';
-import http from 'http'
 
 import wrapJsFileContent from "./utils/wrapJsFileContent.js";
 import generateJsFile from "./utils/generateJsFile.js";
@@ -37,7 +35,6 @@ import agentRoutes from './routes/agent.routes.js';
 import redmineRoutes from './routes/redmine.routes.js';
 import authRoutes from './routes/auth.routes.js';
 
-
 const app = express();
 const PORT = 3000;
 
@@ -56,8 +53,6 @@ const DB_URL = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_USER_PASSW
 const connect = mongoose.connect(DB_URL, { family: 4, dbName: process.env.DB_NAME });
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-const server = http.createServer(app);
 
 connect.then((db) => {
   console.log("Connect server success");
@@ -1132,31 +1127,7 @@ app.use('/api/redmine', redmineRoutes);
 
 app.use(express.static(path.resolve('src/public')));
 
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
-
-const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST"]
-  }
-});
-
-io.on('connection', (socket) => {
-  console.log('⚡ Một user vừa kết nối:', socket.id);
-
-  // Lắng nghe tin nhắn từ 1 người và phát lại cho TẤT CẢ mọi người
-  socket.on('send_message', (data) => {
-    io.emit('receive_message', data);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('❌ User đã ngắt kết nối:', socket.id);
-  });
-});
-
-server.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
