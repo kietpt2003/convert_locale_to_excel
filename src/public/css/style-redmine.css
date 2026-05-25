@@ -674,7 +674,7 @@ table tbody tr:hover {
 .modal {
   display: none;
   position: fixed;
-  z-index: 1000;
+  z-index: 99999;
   left: 0;
   top: 0;
   width: 100%;
@@ -1106,7 +1106,7 @@ select.form-control[size] {
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  z-index: 9999; /* Luôn nổi lên trên cùng mọi thứ */
+  z-index: 99999; /* Luôn nổi lên trên cùng mọi thứ */
   backdrop-filter: blur(3px); /* Hiệu ứng làm mờ nền hiện đại */
 }
 
@@ -1195,4 +1195,8 @@ select.form-control[size] {
   color: #334155;
   cursor: pointer;
   user-select: none;
+}
+
+.report-filters {
+  margin-top: 20px;
 }

@@ -194,7 +194,9 @@ export async function loadUserData() {
       initUserGuide();
 
       const authData = parseJwt(token);
-      if (authData) {
+      const chatWidget = document.getElementById("chat-bubble-btn");
+      if (chatWidget) {
+        chatWidget.style.display = "flex";
         initChatWidget(authData);
       }
 
