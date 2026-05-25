@@ -953,14 +953,34 @@
       <img id="guideImgFull" src="" alt="Full Screen" />
     </div>
 
-    <div id="fb-chat-widget">
+    <div id="chat-bubble-btn" class="chat-bubble-btn">
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="white"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M20 2H4C2.9 2 2 2.9 2 4V22L6 18H20C21.1 18 22 17.1 22 16V4C22 2.9 21.1 2 20 2Z"
+        />
+      </svg>
+      <span
+        id="chat-unread-badge"
+        class="chat-badge"
+        style="display: none"
+      ></span>
+    </div>
+
+    <div id="fb-chat-widget" class="hidden-widget">
       <div class="chat-header" id="chatHeaderToggle">
         <div style="display: flex; align-items: center; width: 100%">
           <div class="online-dot" style="margin-right: 8px"></div>
           <span id="chatTitle" style="font-weight: bold; font-size: 15px"
             >Team Chat</span
           >
-          <span class="chat-toggle-icon">▼</span>
+
+          <span class="chat-close-icon" id="chatCloseBtn">&times;</span>
         </div>
       </div>
 

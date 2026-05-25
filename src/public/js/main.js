@@ -151,7 +151,11 @@ function updateUserInfoUI() {
       };
     }
 
-    initChatWidget(user);
+    const chatWidget = document.getElementById("chat-bubble-btn");
+    if (chatWidget) {
+      chatWidget.style.display = "flex";
+      initChatWidget(user);
+    }
   }
 }
 

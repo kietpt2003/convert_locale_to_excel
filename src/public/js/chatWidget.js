@@ -40,6 +40,10 @@ export function initChatWidget(user) {
   const onlineListPanel = document.getElementById("onlineUsersList");
   const chatTitle = document.getElementById("chatTitle");
 
+  const chatBubbleBtn = document.getElementById("chat-bubble-btn");
+  const chatCloseBtn = document.getElementById("chatCloseBtn");
+  const unreadBadge = document.getElementById("chat-unread-badge");
+
   // ==========================================
   // HÀM BỔ TRỢ: XỬ LÝ TRẠNG THÁI REPLY
   // ==========================================
@@ -61,13 +65,27 @@ export function initChatWidget(user) {
 
   if (btnCancelReply) btnCancelReply.onclick = cancelReply;
 
-  // Cụp / Mở khung chat
-  if (chatHeader && chatWidget) {
-    chatHeader.addEventListener("click", () => {
-      chatWidget.classList.toggle("collapsed");
-      if (!chatWidget.classList.contains("collapsed")) {
-        msgInput.focus();
-      }
+  // ==========================================
+  // XỬ LÝ ĐÓNG / MỞ BONG BÓNG CHAT
+  // ==========================================
+
+  // Khi Click vào Bong Bóng -> Mở Chat
+  if (chatBubbleBtn) {
+    chatBubbleBtn.addEventListener("click", () => {
+      chatWidget.classList.remove("hidden-widget");
+      chatBubbleBtn.style.display = "none"; // Tạm ẩn bong bóng đi
+
+      if (unreadBadge) unreadBadge.style.display = "none"; // Tắt thông báo đỏ
+      msgInput.focus();
+    });
+  }
+
+  // Khi Click vào nút X -> Đóng Chat
+  if (chatCloseBtn) {
+    chatCloseBtn.addEventListener("click", (e) => {
+      e.stopPropagation(); // Ngăn sự kiện lan ra ngoài
+      chatWidget.classList.add("hidden-widget");
+      chatBubbleBtn.style.display = "flex"; // Hiện lại bong bóng
     });
   }
 
