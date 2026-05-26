@@ -1,25 +1,13 @@
-import type { Request, Response } from "express";
 import express from "express";
-import multer from "multer";
 import path from "path";
-import archiver from "archiver";
-import { Writable } from "stream";
 import dotenv from "dotenv";
-import { put } from "@vercel/blob";
 import cors from "cors";
 import mongoose from "mongoose";
-import translate from "translate-google";
-import { isHtml } from "cheerio/utils";
 import { createClient } from "redis";
 
-import wrapJsFileContent from "./utils/wrapJsFileContent.js";
-import generateJsFile from "./utils/generateJsFile.js";
 import { Visitor } from "./models/Visitors.js";
 import { ApiUsage } from "./models/ApiUsage.js";
 import { shouldTrackEndpoint } from "./utils/shouldTrackEndpoint.js";
-import { verifyToken } from "./middleware/validation.js";
-import translateComplexHtml from "./utils/translateComplexHtml.js";
-import delay from "./utils/delay.js";
 import adminRoutes from './routes/admin.routes.js';
 import languageRoutes from './routes/languages.routes.js';
 import agentRoutes from './routes/agent.routes.js';
@@ -30,9 +18,6 @@ import convertKeyRoutes from './routes/convertKey.routes.js'
 
 const app = express();
 const PORT = 3000;
-
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
 
 dotenv.config();
 app.use(cors());
