@@ -1,7 +1,6 @@
 export const IGNORE_ENDPOINT = [
-  "/visits",
-  "/api-usage",
-  "/blob-token",
+  "/api/stats/visits",
+  "/api/convert-key/blob-token",
   "/assets/avatar.JPG",
-  "/api-usage/total"
+  "/api/stats/total-usage"
 ]

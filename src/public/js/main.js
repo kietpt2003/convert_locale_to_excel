@@ -253,7 +253,7 @@ export function animateCount(element, to) {
 // ================= API =================
 export async function loadVisits() {
   try {
-    const res = await fetchWithAuth("/visits");
+    const res = await fetchWithAuth("/api/stats/visits");
     const data = await res.json();
 
     const el = document.getElementById("visit-count");
@@ -304,14 +304,14 @@ function tabDev() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         const url = await uploadFile(file, dataToken.token);
 
         button.textContent = "Processing...";
 
-        const res = await fetchWithAuth("/upload", {
+        const res = await fetchWithAuth("/api/convert-key/upload", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -368,14 +368,14 @@ function tabDev() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         const url = await uploadFile(file, dataToken.token);
 
         button.textContent = "Processing...";
 
-        const res = await fetchWithAuth("/v2/upload-excel", {
+        const res = await fetchWithAuth("/api/convert-key/v2/upload-excel", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -427,7 +427,7 @@ function tabDev() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         // Tải 2 file JS lên Vercel Blob cùng lúc
@@ -439,7 +439,7 @@ function tabDev() {
         button.textContent = "Comparing...";
 
         // Gọi API Diff JS
-        const res = await fetchWithAuth("/diff-js", {
+        const res = await fetchWithAuth("/api/convert-key/diff-js", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ oldFileUrl: oldUrl, newFileUrl: newUrl }),
@@ -497,13 +497,13 @@ function tabDev() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         const fileUrl = await uploadFile(fileOriginal, dataToken.token);
         button.textContent = "Translating...";
 
-        const res = await fetchWithAuth("/translate-js", {
+        const res = await fetchWithAuth("/api/convert-key/translate-js", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fileUrl, targetLangs }),
@@ -557,7 +557,7 @@ function tabCS() {
     button.textContent = "Uploading...";
 
     try {
-      const resToken = await fetchWithAuth("/blob-token", {
+      const resToken = await fetchWithAuth("/api/convert-key/blob-token", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -572,20 +572,23 @@ function tabCS() {
 
       button.textContent = "Processing...";
 
-      const res = await fetchWithAuth("/upload-excel-merge-zip", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const res = await fetchWithAuth(
+        "/api/convert-key/upload-excel-merge-zip",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            file1Url: url1,
+            file2Url: url2,
+            keyColumnFile1,
+            valueColumnFile1,
+            keyColumnFile2,
+            valueColumnFile2,
+          }),
         },
-        body: JSON.stringify({
-          file1Url: url1,
-          file2Url: url2,
-          keyColumnFile1,
-          valueColumnFile1,
-          keyColumnFile2,
-          valueColumnFile2,
-        }),
-      });
+      );
 
       const data = await res.json();
 
@@ -683,7 +686,7 @@ function tabCS() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         const fileUrl = await uploadFile(file, dataToken.token);
@@ -691,7 +694,7 @@ function tabCS() {
         button.textContent = "Processing...";
 
         const res = await fetchWithAuth(
-          "/v2/generate-excels-for-each-locales",
+          "/api/convert-key/v2/generate-excels-for-each-locales",
           {
             method: "POST",
             headers: {
@@ -752,7 +755,7 @@ function tabCS() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         const [oldUrl, newUrl] = await Promise.all([
@@ -762,7 +765,7 @@ function tabCS() {
 
         button.textContent = "Comparing...";
 
-        const res = await fetchWithAuth("/diff-excel", {
+        const res = await fetchWithAuth("/api/convert-key/diff-excel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -829,14 +832,14 @@ function tabCS() {
       button.textContent = "Uploading...";
 
       try {
-        const resToken = await fetchWithAuth("/blob-token");
+        const resToken = await fetchWithAuth("/api/convert-key/blob-token");
         const dataToken = await resToken.json();
 
         const fileUrl = await uploadFile(fileOriginal, dataToken.token);
 
         button.textContent = `Translating ${targetLangs.length} languages...`;
 
-        const res = await fetchWithAuth("/translate-excel", {
+        const res = await fetchWithAuth("/api/convert-key/translate-excel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -871,22 +874,31 @@ export async function loadStats() {
   try {
     const endpoints = [
       { key: "total-access", endpoint: "/" },
-      { key: "upload-count", endpoint: "/upload" },
-      { key: "upload-excel-count", endpoint: "/v2/upload-excel" },
-      { key: "merge-count", endpoint: "/upload-excel-merge-zip" },
+      { key: "upload-count", endpoint: "/api/convert-key/upload" },
+      {
+        key: "upload-excel-count",
+        endpoint: "/api/convert-key/v2/upload-excel",
+      },
+      {
+        key: "merge-count",
+        endpoint: "/api/convert-key/upload-excel-merge-zip",
+      },
       {
         key: "generate-locales",
-        endpoint: "/v2/generate-excels-for-each-locales",
+        endpoint: "/api/convert-key/v2/generate-excels-for-each-locales",
       },
-      { key: "diff-js-count", endpoint: "/diff-js" },
-      { key: "diff-excel-count", endpoint: "/diff-excel" },
-      { key: "translate-excel-count", endpoint: "/translate-excel" },
-      { key: "translate-js-count", endpoint: "/translate-js" },
+      { key: "diff-js-count", endpoint: "/api/convert-key/diff-js" },
+      { key: "diff-excel-count", endpoint: "/api/convert-key/diff-excel" },
+      {
+        key: "translate-excel-count",
+        endpoint: "/api/convert-key/translate-excel",
+      },
+      { key: "translate-js-count", endpoint: "/api/convert-key/translate-js" },
     ];
 
     for (const item of endpoints) {
       const res = await fetchWithAuth(
-        `api-usage/total?endpoint=${item.endpoint}`,
+        `api/stats/total-usage?endpoint=${item.endpoint}`,
       );
       const data = await res.json();
 
