@@ -376,6 +376,10 @@
   font-size: 14px;
   transform: translateX(120%);
   transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  max-width: 320px;
+  word-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 .chat-slide-toast.show {
   transform: translateX(0);
