@@ -267,8 +267,9 @@ export async function loadVisits() {
 export async function uploadFile(file, token) {
   const ext = file.name.split(".").pop();
   const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf("."));
+  const uniqueStr = Math.random().toString(36).substring(2, 9);
 
-  const newName = `${nameWithoutExt}_${Date.now()}.${ext}`;
+  const newName = `${nameWithoutExt}_${Date.now()}_${uniqueStr}.${ext}`;
 
   const { put } = await import("https://esm.sh/@vercel/blob");
 
