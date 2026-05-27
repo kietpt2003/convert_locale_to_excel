@@ -294,7 +294,7 @@ export const getTaskStatuses = async (req: any, res: Response) => {
 
 export const getMonthlyHours = async (req: any, res: Response) => {
   try {
-    const { month, year } = req.query; // Ex: month=4, year=2026
+    const { month, year } = req.query; // Ex: month=5, year=2026
     const account = await getRedmineAccount(req.user.email);
     if (!account || !account.redmineApiKey) {
       return res.status(401).json({ message: "Missing Config" });
@@ -307,27 +307,55 @@ export const getMonthlyHours = async (req: any, res: Response) => {
     const lastDayOfMonth = new Date(Number(year), Number(month), 0).getDate();
     const toDate = `${year}-${paddedMonth}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
-    const timeEntriesRes = await axios.get(`${account.redmineUrl}/time_entries.json`, {
-      params: { user_id: "me", from: fromDate, to: toDate, limit: 1000 },
-      headers: { "X-Redmine-API-Key": account.redmineApiKey }
-    });
+    // ==========================================
+    // 1. LẤY TIME ENTRIES VỚI PHÂN TRANG (PAGINATION)
+    // ==========================================
+    let entries: any[] = [];
+    let offset = 0;
+    const limit = 100; // Mức an toàn và tối đa của Redmine
+    let totalCount = 0;
 
-    const entries = timeEntriesRes.data.time_entries;
-    const issueIds = [...new Set(entries.map((e: any) => e.issue?.id).filter((id: any) => id))];
-
-    const issueMap: Record<number, string> = {};
-
-    if (issueIds.length > 0) {
-      const issuesRes = await axios.get(`${account.redmineUrl}/issues.json`, {
-        params: { issue_id: issueIds.join(','), limit: 1000 },
+    do {
+      const timeEntriesRes = await axios.get(`${account.redmineUrl}/time_entries.json`, {
+        params: { user_id: "me", from: fromDate, to: toDate, limit: limit, offset: offset },
         headers: { "X-Redmine-API-Key": account.redmineApiKey }
       });
 
-      issuesRes.data.issues.forEach((is: any) => {
-        issueMap[is.id] = is.subject;
-      });
+      const fetchedEntries = timeEntriesRes.data.time_entries;
+      entries = entries.concat(fetchedEntries);
+
+      // Lấy tổng số lượng thực tế từ server trả về
+      totalCount = timeEntriesRes.data.total_count || 0;
+      offset += limit;
+
+    } while (entries.length < totalCount); // Lặp cho đến khi lấy đủ tổng số
+
+    // ==========================================
+    // 2. LẤY ISSUES BẰNG CHIA NHỎ (CHUNKING)
+    // ==========================================
+    const issueIds = [...new Set(entries.map((e: any) => e.issue?.id).filter((id: any) => id))];
+    const issueMap: Record<number, string> = {};
+
+    if (issueIds.length > 0) {
+      // Cắt mảng issueIds ra thành từng cụm nhỏ (mỗi cụm 100 ID) để không vượt giới hạn
+      const chunkSize = 100;
+      for (let i = 0; i < issueIds.length; i += chunkSize) {
+        const chunk = issueIds.slice(i, i + chunkSize);
+
+        const issuesRes = await axios.get(`${account.redmineUrl}/issues.json`, {
+          params: { issue_id: chunk.join(','), limit: 100 },
+          headers: { "X-Redmine-API-Key": account.redmineApiKey }
+        });
+
+        issuesRes.data.issues.forEach((is: any) => {
+          issueMap[is.id] = is.subject;
+        });
+      }
     }
 
+    // ==========================================
+    // 3. XỬ LÝ FORMAT DỮ LIỆU ĐẦU RA
+    // ==========================================
     const dailyData: Record<string, any> = {};
 
     entries.forEach((entry: any) => {
@@ -361,7 +389,7 @@ export const getMonthlyHours = async (req: any, res: Response) => {
 
     res.json(result);
   } catch (error: any) {
-    console.error(error);
+    console.error("Lỗi khi fetch monthly log:", error);
     res.status(500).json({ message: "Failed to fetch monthly log status" });
   }
 }

@@ -1,11 +1,20 @@
 import { Request, Response } from 'express';
+import dotenv from "dotenv";
+import CryptoJS from 'crypto-js';
 
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
+import { RedmineAccount } from '../models/RedmineAccount.js';
+import { REDMINE_AUTHEN_ERROR } from '../constants/redmine.js';
+
+dotenv.config();
+
+const ENCRYPT_SECRET = process.env.REDMINE_PWD_SECRET || '';
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 export const getAdminInfo = async (_req: Request, res: Response) => {
   try {
     const users = await AuthorizedUser.find().sort({ createdAt: -1 });
-    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminEmail = ADMIN_EMAIL;
 
     const formattedUsers = users.map(u => ({
       email: u.email,
@@ -39,7 +48,7 @@ export const deleteUser = async (req: Request, res: Response) => {
     const targetEmail = req.params.email;
     const requesterEmail = (req as any).user.email;
 
-    if (targetEmail === process.env.ADMIN_EMAIL) {
+    if (targetEmail === ADMIN_EMAIL) {
       return res.status(400).json({ message: "Cannot delete Super Admin" });
     }
 
@@ -52,7 +61,7 @@ export const deleteUser = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    if (targetUser.role === "admin" && requesterEmail !== process.env.ADMIN_EMAIL) {
+    if (targetUser.role === "admin" && requesterEmail !== ADMIN_EMAIL) {
       return res.status(403).json({ message: "Only Super Admin can delete other admin!" });
     }
 
@@ -60,5 +69,49 @@ export const deleteUser = async (req: Request, res: Response) => {
     res.json({ message: "Delete user success" });
   } catch (err) {
     res.status(500).json({ message: "Delete user failed." });
+  }
+}
+
+export const getRedmineUserInfo = async (req: Request, res: Response) => {
+  try {
+    if (!req.query?.email) {
+      return res.status(403).json({ message: "Email required!" });
+    }
+
+    const user = await AuthorizedUser.findOne({ email: req.query.email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const account = await RedmineAccount.findOne({ userId: user._id });
+
+    const decryptedBytes = CryptoJS.AES.decrypt(account?.password || "", ENCRYPT_SECRET);
+    const plainPassword = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+    if (!plainPassword) {
+      throw new Error(REDMINE_AUTHEN_ERROR.DECRYPTION_FAILED);
+    }
+
+    res.json({
+      email: user.email,
+      role: user.role,
+      redmineProfile: account?.redmineUserId ? {
+        id: account.redmineUserId,
+        login: account.login,
+        password: plainPassword,
+        firstname: account.firstname,
+        lastname: account.lastname,
+        fullName: `${account.lastname || ''} ${account.firstname || ''}`.trim(),
+        admin: account.admin,
+        redmineUrl: account?.redmineUrl || "",
+        redmineApiKey: account?.redmineApiKey || "",
+        watchedProjectIds: account?.watchedProjectIds || [],
+        namingTemplate: account?.namingTemplate || "",
+      } : null
+    });
+  } catch (error) {
+    console.log('check error', error);
+
+    res.status(500).json({ message: "Failed to get user info." });
   }
 }
