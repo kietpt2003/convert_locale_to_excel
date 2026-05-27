@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import qs from 'qs';

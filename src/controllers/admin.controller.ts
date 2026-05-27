@@ -78,12 +78,11 @@ export const getRedmineUserInfo = async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Email required!" });
     }
 
-    const user = await AuthorizedUser.findOne({ email: req.query.email });
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    const account = await RedmineAccount.findOne({ username: req.query.email });
 
-    const account = await RedmineAccount.findOne({ userId: user._id });
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
 
     const decryptedBytes = CryptoJS.AES.decrypt(account?.password || "", ENCRYPT_SECRET);
     const plainPassword = decryptedBytes.toString(CryptoJS.enc.Utf8);
@@ -92,23 +91,10 @@ export const getRedmineUserInfo = async (req: Request, res: Response) => {
       throw new Error(REDMINE_AUTHEN_ERROR.DECRYPTION_FAILED);
     }
 
-    res.json({
-      email: user.email,
-      role: user.role,
-      redmineProfile: account?.redmineUserId ? {
-        id: account.redmineUserId,
-        login: account.login,
-        password: plainPassword,
-        firstname: account.firstname,
-        lastname: account.lastname,
-        fullName: `${account.lastname || ''} ${account.firstname || ''}`.trim(),
-        admin: account.admin,
-        redmineUrl: account?.redmineUrl || "",
-        redmineApiKey: account?.redmineApiKey || "",
-        watchedProjectIds: account?.watchedProjectIds || [],
-        namingTemplate: account?.namingTemplate || "",
-      } : null
-    });
+    let resData = account;
+    resData.password = plainPassword;
+
+    res.json(resData);
   } catch (error) {
     console.log('check error', error);
 
