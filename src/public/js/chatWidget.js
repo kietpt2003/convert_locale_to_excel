@@ -3,17 +3,27 @@ let socket;
 let replyingTo = null;
 let currentChatTarget = "ALL";
 
+// ==========================================
+// THIẾT LẬP BỘ NHỚ TẠM (HISTORY & UNREAD)
+// ==========================================
 const navEntries = performance.getEntriesByType("navigation");
 if (navEntries.length > 0 && navEntries[0].type === "reload") {
   sessionStorage.removeItem("chatAppHistory");
+  sessionStorage.removeItem("chatUnreadCounts");
 }
 
 let chatHistory = JSON.parse(sessionStorage.getItem("chatAppHistory")) || {
   ALL: [],
 };
+let unreadCounts = JSON.parse(sessionStorage.getItem("chatUnreadCounts")) || {
+  ALL: 0,
+};
 
 const saveHistoryToStorage = () => {
   sessionStorage.setItem("chatAppHistory", JSON.stringify(chatHistory));
+};
+const saveUnreadToStorage = () => {
+  sessionStorage.setItem("chatUnreadCounts", JSON.stringify(unreadCounts));
 };
 
 export function initChatWidget(user) {
@@ -45,6 +55,60 @@ export function initChatWidget(user) {
   const unreadBadge = document.getElementById("chat-unread-badge");
 
   // ==========================================
+  // HÀM BỔ TRỢ: CẬP NHẬT GIAO DIỆN BADGE (SỐ ĐẾM)
+  // ==========================================
+
+  // 1. Cập nhật số tổng trên Bong bóng Chat
+  const updateBubbleBadge = () => {
+    if (!unreadBadge) return;
+    // Tính tổng tất cả tin nhắn chưa đọc
+    const total = Object.values(unreadCounts).reduce((a, b) => a + b, 0);
+
+    if (total > 0) {
+      unreadBadge.innerText = total > 99 ? "99+" : total;
+      if (chatWidget.classList.contains("hidden-widget")) {
+        unreadBadge.style.display = "flex";
+      }
+    } else {
+      unreadBadge.style.display = "none";
+    }
+  };
+
+  // 2. Cập nhật số lẻ tẻ trên từng Menu cột trái
+  const updateSidebarBadge = (email) => {
+    if (!onlineListPanel) return;
+    const tab = onlineListPanel.querySelector(
+      `.user-item[data-email="${email}"]`,
+    );
+    if (tab) {
+      let badge = tab.querySelector(".user-item-badge");
+      const count = unreadCounts[email] || 0;
+
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement("div");
+          badge.className = "user-item-badge";
+          tab.appendChild(badge);
+        }
+        badge.innerText = count > 99 ? "99+" : count;
+      } else if (badge) {
+        badge.remove(); // Xóa thẻ nếu về 0
+      }
+    }
+  };
+
+  // 3. Xóa số chưa đọc khi đang xem tab đó
+  const clearUnreadForTarget = (email) => {
+    unreadCounts[email] = 0;
+    saveUnreadToStorage();
+    updateSidebarBadge(email);
+    updateBubbleBadge();
+  };
+
+  // Khởi chạy cập nhật badge lần đầu tiên
+  updateBubbleBadge();
+
+  // ==========================================
   // HÀM BỔ TRỢ: XỬ LÝ TRẠNG THÁI REPLY
   // ==========================================
   const setReply = (msgData) => {
@@ -58,9 +122,7 @@ export function initChatWidget(user) {
 
   const cancelReply = () => {
     replyingTo = null;
-    if (replyPreviewContainer) {
-      replyPreviewContainer.style.display = "none";
-    }
+    if (replyPreviewContainer) replyPreviewContainer.style.display = "none";
   };
 
   if (btnCancelReply) btnCancelReply.onclick = cancelReply;
@@ -68,29 +130,29 @@ export function initChatWidget(user) {
   // ==========================================
   // XỬ LÝ ĐÓNG / MỞ BONG BÓNG CHAT
   // ==========================================
-
-  // Khi Click vào Bong Bóng -> Mở Chat
   if (chatBubbleBtn) {
     chatBubbleBtn.addEventListener("click", () => {
       chatWidget.classList.remove("hidden-widget");
-      chatBubbleBtn.style.display = "none"; // Tạm ẩn bong bóng đi
+      chatBubbleBtn.style.display = "none";
 
-      if (unreadBadge) unreadBadge.style.display = "none"; // Tắt thông báo đỏ
+      // Mở chat thì xóa số báo của tab đang active hiện tại
+      clearUnreadForTarget(currentChatTarget);
+
       msgInput.focus();
     });
   }
 
-  // Khi Click vào nút X -> Đóng Chat
   if (chatCloseBtn) {
     chatCloseBtn.addEventListener("click", (e) => {
-      e.stopPropagation(); // Ngăn sự kiện lan ra ngoài
+      e.stopPropagation();
       chatWidget.classList.add("hidden-widget");
-      chatBubbleBtn.style.display = "flex"; // Hiện lại bong bóng
+      chatBubbleBtn.style.display = "flex";
+      updateBubbleBadge(); // Cập nhật lại bong bóng khi ẩn
     });
   }
 
   // ==========================================
-  // HÀM RENDER TIN NHẮN
+  // HÀM RENDER TIN NHẮN & LỊCH SỬ
   // ==========================================
   const renderMessageBubble = (data, isPrivate = false) => {
     const isMyMsg = data.user?.email === user.email;
@@ -134,7 +196,6 @@ export function initChatWidget(user) {
     replyBtn.className = "chat-action-reply";
     replyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10h10a8 8 0 0 1 8 8v2M3 10l6 6m-6-6l6-6"/></svg>`;
 
-    // 👉 ĐÃ FIX LỖI NÚT REPLY Ở ĐÂY:
     replyBtn.onclick = () => setReply(data);
 
     if (isMyMsg) {
@@ -153,8 +214,7 @@ export function initChatWidget(user) {
 
   const loadChatHistoryToUI = (targetEmail) => {
     if (!chatBox) return;
-
-    chatBox.innerHTML = ""; // Xóa trắng khung chat cũ
+    chatBox.innerHTML = "";
 
     const history = chatHistory[targetEmail] || [];
 
@@ -178,15 +238,30 @@ export function initChatWidget(user) {
   socket.on("update_online_users", (usersArray) => {
     if (!onlineListPanel) return;
 
+    // Render nút Team Chat kèm theo Badge (nếu có)
+    const allCount = unreadCounts["ALL"] || 0;
+    const allBadgeHtml =
+      allCount > 0
+        ? `<div class="user-item-badge">${allCount > 99 ? "99+" : allCount}</div>`
+        : "";
+
     onlineListPanel.innerHTML = `
       <div class="user-item ${currentChatTarget === "ALL" ? "active" : ""}" data-email="ALL">
         <div class="user-item-avatar">🌍</div>
         <div class="user-item-name">Team Chat</div>
+        ${allBadgeHtml}
       </div>
     `;
 
+    // Render danh sách User kèm theo Badge (nếu có)
     usersArray.forEach((u) => {
       if (u.email === user.email) return;
+
+      const count = unreadCounts[u.email] || 0;
+      const badgeHtml =
+        count > 0
+          ? `<div class="user-item-badge">${count > 99 ? "99+" : count}</div>`
+          : "";
 
       const div = document.createElement("div");
       div.className = `user-item ${currentChatTarget === u.email ? "active" : ""}`;
@@ -196,11 +271,12 @@ export function initChatWidget(user) {
           <img src="${u.picture || "https://ui-avatars.com/api/?name=User"}" />
         </div>
         <div class="user-item-name">${u.name}</div>
+        ${badgeHtml}
       `;
       onlineListPanel.appendChild(div);
     });
 
-    // 👉 ĐÃ FIX LỖI ĐỔI TAB BỊ MẤT TIN NHẮN
+    // Sự kiện Click: Đổi Tab
     document.querySelectorAll(".user-item").forEach((item) => {
       item.onclick = function () {
         const targetEmail = this.getAttribute("data-email");
@@ -216,6 +292,9 @@ export function initChatWidget(user) {
         currentChatTarget = targetEmail;
 
         loadChatHistoryToUI(targetEmail);
+
+        // 👉 Xóa số lượng tin nhắn chưa đọc khi click vào xem
+        clearUnreadForTarget(targetEmail);
       };
     });
   });
@@ -227,14 +306,25 @@ export function initChatWidget(user) {
   });
 
   socket.on("receive_message", (data) => {
-    // 👉 Lưu vào lịch sử Team Chat
+    // Lưu vào RAM
     chatHistory["ALL"].push(data);
     saveHistoryToStorage();
 
+    const isHidden = chatWidget.classList.contains("hidden-widget");
+
+    // 1. Chỉ tăng Badge và hiện Toast NẾU đang ẩn khung chat hoặc đang ở tab khác
+    if (isHidden || currentChatTarget !== "ALL") {
+      unreadCounts["ALL"] = (unreadCounts["ALL"] || 0) + 1;
+      saveUnreadToStorage();
+      updateSidebarBadge("ALL");
+      updateBubbleBadge();
+
+      showSlideBanner(`Group message from ${data.user.name}: ${data.text}`);
+    }
+
+    // 2. 👉 FIX LỖI: LUÔN LUÔN vẽ tin nhắn ngầm vào màn hình NẾU đang đứng ở tab Team Chat
     if (currentChatTarget === "ALL") {
       renderMessageBubble(data, false);
-    } else {
-      showSlideBanner(`Group message from ${data.user.name}: ${data.text}`);
     }
   });
 
@@ -242,27 +332,31 @@ export function initChatWidget(user) {
     const isMeSender = data.user.email === user.email;
     const conversationPartner = isMeSender ? data.toEmail : data.user.email;
 
-    // 👉 Lưu vào lịch sử Chat Riêng của đối tác này
+    // Lưu vào RAM
     if (!chatHistory[conversationPartner]) {
       chatHistory[conversationPartner] = [];
     }
-
     chatHistory[conversationPartner].push(data);
     saveHistoryToStorage();
 
-    if (
-      currentChatTarget === "ALL" &&
-      currentChatTarget !== conversationPartner
-    ) {
+    const isHidden = chatWidget.classList.contains("hidden-widget");
+
+    // 1. Chỉ tăng Badge và hiện Toast NẾU đang ẩn khung chat hoặc đang ở tab khác
+    if (isHidden || currentChatTarget !== conversationPartner) {
+      unreadCounts[conversationPartner] =
+        (unreadCounts[conversationPartner] || 0) + 1;
+      saveUnreadToStorage();
+      updateSidebarBadge(conversationPartner);
+      updateBubbleBadge();
+
       showSlideBanner(
         `${data.user.name} sent you a private message: ${data.text}`,
       );
-    } else if (currentChatTarget === conversationPartner) {
+    }
+
+    // 2. 👉 FIX LỖI: LUÔN LUÔN vẽ tin nhắn ngầm vào màn hình NẾU đúng tab
+    if (currentChatTarget === conversationPartner) {
       renderMessageBubble(data, true);
-    } else {
-      showSlideBanner(
-        `${data.user.name} sent you a private message: ${data.text}`,
-      );
     }
   });
 
