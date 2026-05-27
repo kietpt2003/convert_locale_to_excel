@@ -71,14 +71,8 @@ function applyGlobalAnimatedCursor(
 
 const CURSOR_PACKS = {
   system: {
-    default: "../assets/mouse/AmongUsCursors.png",
-    pointer: "../assets/mouse/AmongUsPointer.png",
-    width: "31px",
-    height: "31px",
-  },
-  amongus: {
-    default: "../assets/mouse/AmongUsCursors.png",
-    pointer: "../assets/mouse/AmongUsPointer.png",
+    default: "../assets/mouse/LizardMemeCursors.png",
+    pointer: "../assets/mouse/LizardMemePointer.png",
     width: "31px",
     height: "31px",
   },

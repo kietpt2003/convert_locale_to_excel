@@ -162,7 +162,6 @@ export function initSettingsWidget(options = {}) {
               <div id="st-btn-back-main" class="st-back-btn">⬅ Back to Menu</div>
               
               <button class="st-cursor-btn" data-pack="system">System Default</button>
-              <button class="st-cursor-btn" data-pack="amongus">Among Us</button>
               <button class="st-cursor-btn" data-pack="lizardmeme">Lizard Meme</button>
               <button class="st-cursor-btn" data-pack="catknife">Cat Knife</button>
               <button class="st-cursor-btn" data-pack="cathand">Cat Hand</button>
