@@ -166,6 +166,8 @@ export function initSettingsWidget(options = {}) {
               <button class="st-cursor-btn" data-pack="lizardmeme">Lizard Meme</button>
               <button class="st-cursor-btn" data-pack="catknife">Cat Knife</button>
               <button class="st-cursor-btn" data-pack="cathand">Cat Hand</button>
+              <button class="st-cursor-btn" data-pack="catshark">Cat Shark</button>
+              <button class="st-cursor-btn" data-pack="kawaiicat">Kawaii Cat</button>
             </div>
 
           </div>

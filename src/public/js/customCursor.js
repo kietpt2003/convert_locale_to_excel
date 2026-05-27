@@ -1,6 +1,12 @@
 let fakeCursorDiv = null;
 
-function applyGlobalAnimatedCursor(defaultGifUrl, pointerPngUrl) {
+function applyGlobalAnimatedCursor(
+  defaultGifUrl,
+  pointerPngUrl,
+  width = "32px",
+  height = "32px",
+  transform = "translate(0, 0)",
+) {
   // 1. Giấu con trỏ thật của trình duyệt bằng CSS
   let cursorStyle = document.getElementById("global-custom-cursor-style");
   if (!cursorStyle) {
@@ -21,13 +27,13 @@ function applyGlobalAnimatedCursor(defaultGifUrl, pointerPngUrl) {
       position: "fixed",
       top: "0",
       left: "0",
-      width: "32px", // Chỉnh kích thước chuột tại đây
-      height: "32px",
+      width: width, // Chỉnh kích thước chuột tại đây
+      height: height,
       pointerEvents: "none", // BẮT BUỘC: Để click xuyên qua được ảnh
       zIndex: "999999",
       backgroundSize: "contain",
       backgroundRepeat: "no-repeat",
-      transform: "translate(0, 0)", // Nếu tâm ảnh ở giữa thì đổi thành translate(-50%, -50%)
+      transform: transform, // Nếu tâm ảnh ở giữa thì đổi thành translate(-50%, -50%)
       transition: "background-image 0.1s ease", // Hiệu ứng chuyển mượt khi biến hình
     });
 
@@ -67,22 +73,45 @@ const CURSOR_PACKS = {
   system: {
     default: "../assets/mouse/AmongUsCursors.png",
     pointer: "../assets/mouse/AmongUsPointer.png",
+    width: "31px",
+    height: "31px",
   },
   amongus: {
     default: "../assets/mouse/AmongUsCursors.png",
     pointer: "../assets/mouse/AmongUsPointer.png",
+    width: "31px",
+    height: "31px",
   },
   lizardmeme: {
     default: "../assets/mouse/LizardMemeCursors.png",
     pointer: "../assets/mouse/LizardMemePointer.png",
+    width: "48px",
+    height: "48px",
+    transform: "translate(-50%, -50%)",
   },
   catknife: {
     default: "../assets/mouse/catKnifeCursors.png",
     pointer: "../assets/mouse/catKnifePointer.png",
+    width: "52px",
+    height: "52px",
   },
   cathand: {
     default: "../assets/mouse/catHandCursors.png",
     pointer: "../assets/mouse/catHandPointer.png",
+    width: "42px",
+    height: "42px",
+  },
+  catshark: {
+    default: "../assets/mouse/catSharkCursors.png",
+    pointer: "../assets/mouse/catSharkPointer.png",
+    width: "58px",
+    height: "58px",
+  },
+  kawaiicat: {
+    default: "../assets/mouse/kawaiiCatCursors.png",
+    pointer: "../assets/mouse/kawaiiCatPointer.png",
+    width: "48px",
+    height: "48px",
   },
 };
 
@@ -98,7 +127,13 @@ function setCursorPack(packId) {
 
   // Lấy data từ kho ra và apply
   const pack = CURSOR_PACKS[packId];
-  applyGlobalAnimatedCursor(pack.default, pack.pointer);
+  applyGlobalAnimatedCursor(
+    pack.default,
+    pack.pointer,
+    pack.width,
+    pack.height,
+    pack.transform,
+  );
 
   // Lưu vào bộ nhớ để F5 không bị mất
   localStorage.setItem("saved_cursor", packId);
