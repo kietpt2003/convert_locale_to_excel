@@ -17,7 +17,7 @@ export function initSettingsWidget(options = {}) {
         position: fixed;
         width: 64px;
         height: 64px;
-        background-color: #1e293b;
+        background-color: black;
         color: white;
         border-radius: 50%;
         display: flex;
@@ -33,8 +33,6 @@ export function initSettingsWidget(options = {}) {
         transform: scale(1.1) rotate(45deg);
         background-color: #334155;
       }
-
-      /* 👉 Đã xóa các class .st-pos-... cứng ở đây vì không cần nữa */
 
       /* Màn hình mờ phía sau Modal (Overlay) */
       .st-modal-overlay {
@@ -167,6 +165,7 @@ export function initSettingsWidget(options = {}) {
               <button class="st-cursor-btn" data-pack="cathand">Cat Hand</button>
               <button class="st-cursor-btn" data-pack="catshark">Cat Shark</button>
               <button class="st-cursor-btn" data-pack="kawaiicat">Kawaii Cat</button>
+              <button class="st-cursor-btn" data-pack="hellokitty">Hello Kitty</button>
             </div>
 
           </div>

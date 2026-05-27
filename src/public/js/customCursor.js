@@ -52,7 +52,7 @@ function applyGlobalAnimatedCursor(
   // 4. Lắng nghe sự kiện rê chuột (Hover) để biến hình
   // Danh sách các selector cần đổi sang chuột pointer
   const pointerSelectors =
-    'a, a *, button, button *, input[type="button"], input[type="submit"], select, select *, [role="button"], .cursor-pointer, .tab, .tab *';
+    'a, a *, button, button *, input[type="button"], input[type="submit"], select, select *, [role="button"], .cursor-pointer, .tab, .tab *, .st-floating-btn, .chat-bubble-btn, #agent-widget, .chat-close-icon, .user-item, .guide-tab-item, .guide-step-img, .guide-img-full-close, .explorer-item, .project-name, .log-time-trigger, .close-modal';
 
   document.body.addEventListener("mouseover", (e) => {
     // Nếu chuột chạm vào các phần tử có tính tương tác
@@ -106,6 +106,12 @@ const CURSOR_PACKS = {
     pointer: "../assets/mouse/kawaiiCatPointer.png",
     width: "48px",
     height: "48px",
+  },
+  hellokitty: {
+    default: "../assets/mouse/HelloKittyCursors.png",
+    pointer: "../assets/mouse/HelloKittyPointer.png",
+    width: "32px",
+    height: "32px",
   },
 };
 
