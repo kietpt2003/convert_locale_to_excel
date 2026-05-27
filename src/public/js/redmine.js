@@ -13,6 +13,7 @@ import {
   initQuickModalEvents,
   openQuickLogTime,
 } from "./projectRedmineExplorer.js";
+import { initSettingsWidget } from "./settingsWidget.js";
 import { initCreateTaskTab } from "./tabCreateTask.js";
 import { initSpentTimeReportTab } from "./tabSpentTimeReport.js";
 import { initUserGuide } from "./userGuide.js";
@@ -149,6 +150,8 @@ export async function initApp() {
   document.getElementById("prevMonth").onclick = () => changeMonth(-1);
   document.getElementById("nextMonth").onclick = () => changeMonth(1);
   document.getElementById("btnToday").onclick = () => goToToday();
+
+  initSettingsWidget({ bottom: "200px", right: "24px" });
 }
 
 // 1. Load configuration from MongoDB

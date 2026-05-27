@@ -1,5 +1,6 @@
 import { initChatAgent } from "./chat-agent.js";
 import { initChatWidget } from "./chatWidget.js";
+import { initSettingsWidget } from "./settingsWidget.js";
 
 let authToken = localStorage.getItem("app_token");
 
@@ -913,6 +914,7 @@ export async function loadStats() {
 
 // ================= INIT =================
 export function init() {
+  initSettingsWidget({ bottom: "200px", right: "24px" });
   loadVisits();
   loadStats();
 
