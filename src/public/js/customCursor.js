@@ -129,8 +129,8 @@ const CURSOR_PACKS = {
   catshark: {
     name: "Cat Shark",
     category: "Animals",
-    default: "../assets/mouse/catSharkCursors.png",
-    pointer: "../assets/mouse/catSharkPointer.png",
+    default: "../assets/mouse/CatSharkCursors.png",
+    pointer: "../assets/mouse/CatSharkPointer.png",
     width: "58px",
     height: "58px",
   },
