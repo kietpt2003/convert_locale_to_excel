@@ -137,8 +137,8 @@ const CURSOR_PACKS = {
   kawaiicat: {
     name: "Kawaii Cat",
     category: "Animals",
-    default: "../assets/mouse/kawaiiCatCursors.png",
-    pointer: "../assets/mouse/kawaiiCatPointer.png",
+    default: "../assets/mouse/KawaiiCatCursors.png",
+    pointer: "../assets/mouse/KawaiiCatPointer.png",
     width: "48px",
     height: "48px",
   },
