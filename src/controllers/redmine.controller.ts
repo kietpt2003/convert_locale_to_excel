@@ -177,7 +177,7 @@ export const getTasks = async (req: any, res: Response) => {
 
 export const createTask = async (req: any, res: Response) => {
   try {
-    const { project_id, subject, parent_issue_id, assigned_to_id, tracker_id, custom_fields } = req.body;
+    const { project_id, subject, parent_issue_id, assigned_to_id, tracker_id, custom_fields, done_ratio } = req.body;
 
     if (!project_id || !subject) {
       return res.status(400).json({ message: "Project ID and Subject are required" });
@@ -195,6 +195,7 @@ export const createTask = async (req: any, res: Response) => {
         parent_issue_id: parent_issue_id || null,
         assigned_to_id: assigned_to_id === "me" ? "me" : assigned_to_id,
         tracker_id: tracker_id || REDMINE_TASK_TRACKER_ID.TASK.key,
+        done_ratio: done_ratio || 0,
       }
     };
 
