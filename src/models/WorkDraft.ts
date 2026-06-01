@@ -7,6 +7,7 @@ const workDraftSchema = new mongoose.Schema({
   hours: { type: Number, required: true },   // Số giờ làm
   spentOn: { type: String, required: true }, // Ngày làm (YYYY-MM-DD)
   activityId: { type: Number, required: true },
+  trackerId: { type: Number, required: true },
   comments: { type: String },
   status: { type: String, enum: [WORK_DRAFT_STATUS.PENDING, WORK_DRAFT_STATUS.COMPLETED], default: 'PENDING' },
   createdAt: { type: Date, default: Date.now }

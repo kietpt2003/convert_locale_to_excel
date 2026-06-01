@@ -27,11 +27,11 @@ export const getDrafts = async (req: any, res: Response) => {
 // 2. TẠO BẢN NHÁP MỚI
 export const createDraft = async (req: any, res: Response) => {
   try {
-    const { subject, hours, spentOn, activityId, comments } = req.body;
+    const { subject, hours, spentOn, activityId, comments, trackerId } = req.body;
 
     // Validate dữ liệu đầu vào
-    if (!subject || !hours || !spentOn || !activityId) {
-      return res.status(400).json({ success: false, message: "Please fill in the Subject, Hours, Date and select activity." });
+    if (!subject || !hours || !spentOn || !activityId || !trackerId) {
+      return res.status(400).json({ success: false, message: "Please fill in the Subject, Hours, Date, Tracker and select activity." });
     }
 
     const user = await AuthorizedUser.findOne({ email: req.user.email });
@@ -47,6 +47,7 @@ export const createDraft = async (req: any, res: Response) => {
       spentOn,
       activityId: Number(activityId),
       comments: comments || "",
+      trackerId: Number(trackerId),
     });
     await newDraft.save();
 
