@@ -1,8 +1,12 @@
 import { initChatAgent } from "./chat-agent.js";
 import { initChatWidget } from "./chatWidget.js";
+import { resetToDefaultCursor } from "./customCursor.js";
 import { initSettingsWidget } from "./settingsWidget.js";
 
 let authToken = localStorage.getItem("app_token");
+
+export const DEADLINE_DATE = new Date("2026-07-01T00:00:00").getTime();
+export const NEW_WEBSITE_URL = "https://my-only-tool.vercel.app";
 
 async function fetchWithAuth(url, options = {}) {
   const currentToken = localStorage.getItem("app_token");
@@ -23,11 +27,27 @@ async function fetchWithAuth(url, options = {}) {
 
 // ================= AUTHENTICATION =================
 export function initAuth() {
-  // --- Get TOKEN receive from BACKEND redirect ---
+  // --- Check Migration Shutdown ---
+  const now = Date.now();
+  const isShutDown = now >= DEADLINE_DATE;
+
+  if (isShutDown) {
+    // Nếu đã qua ngày 01/07/2026: Hiển thị màn hình khóa vĩnh viễn
+    resetToDefaultCursor();
+    showHardShutdownPopup();
+    // Ẩn mọi UI cũ, ngắt luôn luồng chạy để không render nút Google Login
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("main-app").style.display = "none";
+    return; // Dừng hoàn toàn ứng dụng tại đây
+  } else {
+    // Nếu chưa tới hạn: Hiển thị popup cảnh báo
+    showMigrationWarningPopup();
+  }
+
+  // --- Luồng hoạt động bình thường (Nếu chưa bị shutdown) ---
   const hashParams = new URLSearchParams(window.location.hash.substring(1));
   const urlToken = hashParams.get("token");
   const urlError = hashParams.get("error");
-  // const existingToken = localStorage.getItem("app_token");
 
   if (urlError) {
     localStorage.removeItem("app_token");
@@ -54,15 +74,12 @@ export function initAuth() {
     document.getElementById("main-app").style.display = "block";
 
     updateUserInfoUI(); //Update user info to UI
-
     init();
   } else {
     google.accounts.id.initialize({
       client_id:
         "797919519685-raio24mb9u572jjc26o7mj7bsg8m4vrc.apps.googleusercontent.com",
-      // Redirect to signin Google
       ux_mode: "redirect",
-      // Endpoint Backend for google redirect
       login_uri: window.location.origin + "/api/auth/google",
     });
 
@@ -71,6 +88,217 @@ export function initAuth() {
       { theme: "outline", size: "large" },
     );
   }
+}
+
+export function showMigrationWarningPopup() {
+  if (document.getElementById("migration-warning-overlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "migration-warning-overlay";
+
+  overlay.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.6); 
+    backdrop-filter: blur(6px);
+    z-index: 99999;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    box-sizing: border-box; 
+  `;
+
+  const box = document.createElement("div");
+
+  box.style.cssText = `
+    background: #ffffff; 
+    padding: 40px 32px; 
+    border-radius: 24px;
+    max-width: 420px; 
+    width: 90%;
+    text-align: center; 
+    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.2);
+    animation: warning-scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-sizing: border-box; 
+  `;
+
+  box.innerHTML = `
+    <style>
+      @keyframes warning-scaleIn {
+        0% { opacity: 0; transform: scale(0.95) translateY(10px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .btn-primary {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%);
+        color: #ffffff !important; 
+        text-decoration: none; 
+        padding: 12px 24px; 
+        border-radius: 12px;
+        font-weight: 600; 
+        font-size: 15px;
+        border: none; cursor: pointer; transition: all 0.2s; width: 100%;
+        box-shadow: 0 4px 12px rgba(15, 118, 110, 0.25);
+        box-sizing: border-box; 
+        margin: 0; 
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(15, 118, 110, 0.4);
+      }
+      .btn-secondary {
+        display: block; 
+        background: #f1f5f9; 
+        color: #475569; 
+        border: none;
+        padding: 12px 24px; 
+        border-radius: 12px; 
+        font-weight: 600; 
+        font-size: 15px;
+        cursor: pointer; 
+        transition: all 0.2s; 
+        width: 100%; 
+        margin: 12px 0 0 0; 
+        box-sizing: border-box; 
+      }
+      .btn-secondary:hover {
+        background: #e2e8f0; 
+        color: #1e293b;
+      }
+    </style>
+
+    <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+      <lottie-player 
+        src="assets/BoredHorseDrinkingCoffee.json" 
+        background="transparent" 
+        speed="1" 
+        style="width: 140px; height: 140px;" 
+        loop 
+        autoplay>
+      </lottie-player>
+    </div>
+    
+    <h2 style="margin: 0 0 12px 0; color: #0f172a; font-size: 22px; font-weight: 800;">
+      Platform Outdated Soon
+    </h2>
+    
+    <p style="color: #475569; font-size: 15px; line-height: 1.5; margin-bottom: 28px;">
+      This current website will be officially retired and unsupported on <strong>01/07/2026</strong>. We highly encourage you to switch to the new system now to ensure a seamless transition!
+    </p>
+    
+    <div style="display: flex; flex-direction: column; width: 100%; box-sizing: border-box;">
+      <a href="${NEW_WEBSITE_URL}" target="_blank" rel="noopener noreferrer" class="btn-primary" id="btn-go-new">
+        Switch to the New Platform
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14"></path>
+          <path d="m12 5 7 7-7 7"></path>
+        </svg>
+      </a>
+      
+      <button class="btn-secondary" id="btn-close-warning">
+        Not now, continue to current version
+      </button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  document.getElementById("btn-close-warning").addEventListener("click", () => {
+    overlay.remove();
+  });
+
+  document.getElementById("btn-go-new").addEventListener("click", () => {
+    overlay.remove();
+  });
+}
+
+export function showHardShutdownPopup() {
+  if (document.getElementById("shutdown-overlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "shutdown-overlay";
+
+  overlay.style.cssText = `
+    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(15, 23, 42, 0.7); 
+    backdrop-filter: blur(8px);
+    z-index: 999999;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  `;
+
+  const box = document.createElement("div");
+
+  box.style.cssText = `
+    background: #ffffff; 
+    padding: 48px 40px; 
+    border-radius: 24px;
+    max-width: 460px; 
+    width: 90%;
+    text-align: center; 
+    box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25), 0 0 0 1px rgba(0,0,0,0.05);
+    animation: modal-scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  `;
+
+  box.innerHTML = `
+    <style>
+      @keyframes modal-scaleIn {
+        0% { opacity: 0; transform: scale(0.95) translateY(15px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .shutdown-btn {
+        display: inline-flex; 
+        align-items: center; 
+        justify-content: center; 
+        gap: 8px;
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: #ffffff !important;
+        text-decoration: none; 
+        padding: 14px 32px; 
+        border-radius: 12px;
+        font-weight: 600; 
+        font-size: 16px; 
+        box-shadow: 0 4px 14px 0 rgba(37, 99, 235, 0.35);
+        transition: all 0.2s ease-in-out;
+      }
+      .shutdown-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5);
+      }
+      .shutdown-btn:active {
+        transform: translateY(0);
+      }
+    </style>
+
+    <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+      <lottie-player 
+        src="assets/UnderMaintenance.json" 
+        background="transparent" 
+        speed="1" 
+        style="width: 140px; height: 140px;" 
+        loop 
+        autoplay>
+      </lottie-player>
+    </div>
+
+    <h1 style="margin: 0 0 12px 0; color: #0f172a; font-size: 26px; font-weight: 800; letter-spacing: -0.5px;">
+      Platform Officially Outdated
+    </h1>
+    
+    <p style="color: #475569; font-size: 16px; line-height: 1.6; margin-bottom: 32px;">
+      This system was officially decommissioned on <strong>01/07/2026</strong> and is no longer accessible. Please migrate to the new platform to continue your workflow without interruption.
+    </p>
+    
+    <a href="${NEW_WEBSITE_URL}" target="_blank" rel="noopener noreferrer" class="shutdown-btn">
+      Go to the New Platform
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14"></path>
+        <path d="m12 5 7 7-7 7"></path>
+      </svg>
+    </a>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
 }
 
 export function signOut() {
@@ -1013,3 +1241,67 @@ async function loadAdminUsers() {
     console.error("Load users failed", e);
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const marqueeEl = document.getElementById("dynamic-marquee");
+  if (!marqueeEl) return;
+
+  // 1. Bơm toàn bộ CSS (bao gồm hiệu ứng FBI và Layout cách khoảng)
+  if (!document.getElementById("fbi-warning-styles")) {
+    const styleBlock = document.createElement("style");
+    styleBlock.id = "fbi-warning-styles";
+    styleBlock.innerHTML = `
+      /* Cách xa 2 câu thông báo để không bị dính chùm */
+      .marquee-item {
+        display: inline-block;
+        margin-right: 100vw; /* Đẩy câu tiếp theo ra xa bằng 1 màn hình */
+      }
+
+      /* Hiệu ứng đèn cảnh sát */
+      @keyframes strobe-light {
+        0%, 100% { background-color: #dc2626; color: #ffffff; box-shadow: 0 0 10px #dc2626; }
+        50% { background-color: #fef08a; color: #b91c1c; box-shadow: 0 0 15px #fef08a; }
+      }
+      .fbi-alert-box {
+        display: inline-flex; align-items: center; background: #09090b; color: #f8fafc;
+        padding: 4px 16px 4px 6px; border-radius: 8px; border: 1px solid #ef4444;
+        box-shadow: 0 0 12px rgba(239, 68, 68, 0.6); font-family: 'Courier New', Courier, monospace;
+        letter-spacing: 0.5px;
+      }
+      .fbi-badge {
+        animation: strobe-light 0.6s infinite; padding: 4px 10px; border-radius: 4px;
+        font-weight: 900; margin-right: 12px; text-transform: uppercase; font-family: sans-serif;
+      }
+      .fbi-link {
+        color: #38bdf8 !important; text-decoration: none; border-bottom: 2px dashed #38bdf8;
+        margin: 0 8px; font-weight: 900; transition: all 0.2s; text-transform: uppercase;
+      }
+      .fbi-link:hover {
+        color: #fbbf24 !important; border-bottom-color: #fbbf24; text-shadow: 0 0 8px rgba(251, 191, 36, 0.8);
+      }
+    `;
+    document.head.appendChild(styleBlock);
+  }
+
+  // 2. Chèn thẳng 2 câu vào HTML cùng lúc, bọc trong class "marquee-item"
+  marqueeEl.innerHTML = `
+    <span class="marquee-item fbi-alert-box">
+      <span class="fbi-badge">🚨 FBI WARNING</span>
+      This platform will be PERMANENTLY RETIRED on <strong style="color: #ef4444; margin: 0 6px; font-size: 16px;">01/07/2026</strong>. 
+      You must 
+      <a href="${NEW_WEBSITE_URL}" target="_blank" rel="noopener noreferrer" class="fbi-link">
+        MIGRATE TO THE NEW SYSTEM
+      </a> 
+      immediately to ensure uninterrupted workflow!
+    </span>
+
+    <span class="marquee-item">
+      🚀 If the Key Generator Tool has been valuable to your workflow and
+      saved you time, please consider supporting the developer.
+      <a href="javascript:void(0)" onclick="openDonationPopup()" style="color: #ffeb3b; text-decoration: underline; font-weight: bold; padding: 0 5px; cursor: pointer;">
+        Buy me a Coffee
+      </a>
+      Your generosity is deeply appreciated! ❤️
+    </span>
+  `;
+});

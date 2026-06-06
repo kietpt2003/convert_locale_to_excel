@@ -519,6 +519,10 @@ export const getUserInfo = async (req: any, res: Response) => {
 
     const account = await RedmineAccount.findOne({ userId: user._id });
 
+    if (!account) {
+      return res.status(404).json({ message: REDMINE_AUTHEN_ERROR.REDMINE_NOT_LINKED });
+    }
+
     const decryptedBytes = CryptoJS.AES.decrypt(account?.password || "", ENCRYPT_SECRET);
     const plainPassword = decryptedBytes.toString(CryptoJS.enc.Utf8);
 

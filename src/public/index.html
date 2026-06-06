@@ -7,6 +7,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
     <script src="./js/customCursor.js"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 
     <link rel="stylesheet" href="/css/style.css" />
     <link rel="stylesheet" href="/css/style-agent.css" />
@@ -105,26 +106,7 @@
 
     <div id="main-app">
       <div class="announcement-bar">
-        <div class="marquee">
-          <span>
-            🚀 If the Key Generator Tool has been valuable to your workflow and
-            saved you time, please consider supporting the developer.
-            <a
-              href="javascript:void(0)"
-              onclick="openDonationPopup()"
-              style="
-                color: #ffeb3b;
-                text-decoration: underline;
-                font-weight: bold;
-                padding: 0 5px;
-                cursor: pointer;
-              "
-            >
-              Buy me a Coffee
-            </a>
-            Your generosity is deeply appreciated! ❤️
-          </span>
-        </div>
+        <div class="marquee" id="dynamic-marquee"></div>
       </div>
 
       <div class="container">

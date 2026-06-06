@@ -6,9 +6,15 @@ import {
   initGlobalTooltip,
 } from "./calendar.js";
 import { initChatWidget } from "./chatWidget.js";
+import { resetToDefaultCursor } from "./customCursor.js";
 import { debounce } from "./debounce.js";
 import { initDraftWidget, loadDrafts } from "./draftWidget.js";
-import { parseJwt } from "./main.js";
+import {
+  DEADLINE_DATE,
+  parseJwt,
+  showHardShutdownPopup,
+  showMigrationWarningPopup,
+} from "./main.js";
 import {
   initQuickModalEvents,
   openQuickLogTime,
@@ -76,6 +82,16 @@ export async function fetchWithAuth(url, options = {}) {
  * Initialize application events
  */
 export async function initApp() {
+  const now = Date.now();
+  const isShutDown = now >= DEADLINE_DATE;
+  if (isShutDown) {
+    resetToDefaultCursor();
+    showHardShutdownPopup();
+    return;
+  } else {
+    showMigrationWarningPopup();
+  }
+
   // Load initial data
   await loadUserData();
 

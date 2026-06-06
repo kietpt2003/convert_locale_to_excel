@@ -506,8 +506,8 @@ button:disabled {
 
 .marquee {
   display: inline-block;
-  animation: marquee 20s linear infinite;
-  font-size: 14px;
+  animation: marquee 40s linear infinite;
+  font-size: 16px;
 }
 
 @keyframes marquee {

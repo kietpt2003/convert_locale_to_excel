@@ -286,7 +286,7 @@ function setCursorPack(packId) {
   localStorage.setItem("saved_cursor", packId);
 }
 
-function resetToDefaultCursor() {
+export function resetToDefaultCursor() {
   const cursorStyle = document.getElementById("global-custom-cursor-style");
   if (cursorStyle) cursorStyle.remove();
 
