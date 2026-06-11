@@ -125,6 +125,7 @@ export const handleSignInV2 = async (req: Request, res: Response) => {
     // Generate Custom JWT Token
     const customToken = jwt.sign(
       {
+        id: authUser._id.toString(),
         email: payload.email,
         name: payload.name,
         picture: payload.picture,

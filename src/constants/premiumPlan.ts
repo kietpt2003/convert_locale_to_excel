@@ -1,0 +1,12 @@
+export const PREMIUM_PLAN = {
+  NONE: 'NONE',
+  TRIAL: 'TRIAL',
+  DAILY: 'DAILY',
+  MONTHLY: 'MONTHLY',
+  YEARLY: 'YEARLY',
+  LIFETIME: 'LIFETIME'
+} as const
+
+export const PREMIUM_ERROR = {
+  PREMIUM_REQUIRED: 'PREMIUM_REQUIRED'
+} as const

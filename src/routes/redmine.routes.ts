@@ -27,10 +27,11 @@ import {
   getScrapeFilters,
 } from '../controllers/redmine.controller.js';
 import { createDraft, deleteDraft, executeDraftMatch, getDrafts } from '../controllers/draft.controller.js';
+import { checkPremiumAccess } from '../middleware/authPremium.js';
 
 const router = Router();
 
-router.use(verifyToken);
+router.use(verifyToken, checkPremiumAccess);
 
 router.post('/logtime', logTime);
 router.get('/projects/:projectId/tasks', getTasks);

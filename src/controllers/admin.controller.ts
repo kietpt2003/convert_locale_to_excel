@@ -5,6 +5,7 @@ import CryptoJS from 'crypto-js';
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
 import { RedmineAccount } from '../models/RedmineAccount.js';
 import { REDMINE_AUTHEN_ERROR } from '../constants/redmine.js';
+import { PREMIUM_PLAN } from '../constants/premiumPlan.js';
 
 dotenv.config();
 
@@ -17,9 +18,14 @@ export const getAdminInfo = async (_req: Request, res: Response) => {
     const adminEmail = ADMIN_EMAIL;
 
     const formattedUsers = users.map(u => ({
+      id: u.id,
       email: u.email,
       role: u.email === adminEmail ? "super_admin" : u.role,
-      createdAt: u.createdAt
+      createdAt: u.createdAt,
+      isSuperAdmin: u.email === adminEmail,
+      hasUsedTrial: u.hasUsedTrial,
+      premiumPlan: u.premiumPlan,
+      premiumValidUntil: u.premiumValidUntil
     }));
 
     res.json(formattedUsers);
@@ -101,3 +107,129 @@ export const getRedmineUserInfo = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to get user info." });
   }
 }
+
+export const grantUserPremium = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const requesterEmail = (req as any).user.email;
+    const adminEmail = ADMIN_EMAIL;
+
+    if (requesterEmail !== adminEmail) {
+      return res.status(403).json({
+        message: "🛡️ Access Denied. Only Super Admin can manually grant premium plans!"
+      });
+    }
+
+    const { email, planType, days } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Target user email is required." });
+    }
+
+    const targetUser = await AuthorizedUser.findOne({ email });
+    if (!targetUser) {
+      return res.status(404).json({ message: "Target user registry not found." });
+    }
+
+    const selectedPlan = planType || PREMIUM_PLAN.TRIAL;
+    const defaultDays = days || 7;
+
+    const expiryDate = new Date();
+
+    if (selectedPlan === PREMIUM_PLAN.LIFETIME) {
+      targetUser.premiumValidUntil = null;
+    } else if (selectedPlan === PREMIUM_PLAN.DAILY) {
+      expiryDate.setDate(expiryDate.getDate() + (days || 1));
+      targetUser.premiumValidUntil = expiryDate;
+    } else if (selectedPlan === PREMIUM_PLAN.MONTHLY) {
+      expiryDate.setMonth(expiryDate.getMonth() + (days || 1));
+      targetUser.premiumValidUntil = expiryDate;
+    } else if (selectedPlan === PREMIUM_PLAN.YEARLY) {
+      expiryDate.setFullYear(expiryDate.getFullYear() + (days || 1));
+      targetUser.premiumValidUntil = expiryDate;
+    } else {
+      expiryDate.setDate(expiryDate.getDate() + defaultDays);
+      targetUser.premiumValidUntil = expiryDate;
+      targetUser.hasUsedTrial = true;
+    }
+
+    targetUser.premiumPlan = selectedPlan;
+    await targetUser.save();
+
+    return res.json({
+      message: `🎉 Successfully granted [${selectedPlan}] access to ${email}!`,
+      data: {
+        email: targetUser.email,
+        premiumPlan: targetUser.premiumPlan,
+        premiumValidUntil: targetUser.premiumValidUntil
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Critical error inside grantUserPremium admin controller:", error);
+    return res.status(500).json({
+      message: "Internal server error during premium distribution process.",
+      error: error.message
+    });
+  }
+};
+
+/**
+ * =========================================================================
+ * 👉 LOGIC MỚI: SỬA/XÓA GÓI CỦA 1 USER (HẠ CẤP VỀ GÓI THƯỜNG 'NONE')
+ * =========================================================================
+ */
+export const revokeUserPremium = async (req: Request, res: Response): Promise<any> => {
+  try {
+    const requesterEmail = (req as any).user.email;
+    const adminEmail = ADMIN_EMAIL;
+
+    // 🔒 BẢO VỆ TỐI CAO: Chỉ Super Admin thực sự mới được phép thu hồi/hạ cấp gói VIP
+    if (requesterEmail !== adminEmail) {
+      return res.status(403).json({
+        message: "🛡️ Access Denied. Only Super Admin can manually revoke premium plans!"
+      });
+    }
+
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Target user email is required." });
+    }
+
+    // 1. Tìm kiếm User cần xóa gói trong hệ thống
+    const targetUser = await AuthorizedUser.findOne({ email });
+    if (!targetUser) {
+      return res.status(404).json({ message: "Target user registry not found." });
+    }
+
+    // 2. Nếu user vốn dĩ đang là gói NONE thì báo luôn để đỡ ghi đè DB vô nghĩa
+    if (targetUser.premiumPlan === PREMIUM_PLAN.NONE) {
+      return res.status(400).json({ message: "This user already has no active premium plan (NONE)." });
+    }
+
+    // 3. Tiến hành xóa gói: chuyển premiumPlan về NONE và gán ngày hết hạn thành null
+    targetUser.premiumPlan = PREMIUM_PLAN.NONE;
+    targetUser.premiumValidUntil = null;
+
+    // Lưu ý: Chúng ta GIỮ NGUYÊN trạng thái u.hasUsedTrial để tránh việc user 
+    // lợi dụng việc bị xóa gói để vào bấm nút dùng thử (Trial) lại một lần nữa.
+
+    await targetUser.save();
+
+    return res.json({
+      message: `🗑️ Successfully revoked premium plan from ${email}. Account tier downgraded to NONE!`,
+      data: {
+        email: targetUser.email,
+        premiumPlan: targetUser.premiumPlan,
+        premiumValidUntil: targetUser.premiumValidUntil
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Critical error inside revokeUserPremium admin controller:", error);
+    return res.status(500).json({
+      message: "Internal server error during premium revocation process.",
+      error: error.message
+    });
+  }
+};

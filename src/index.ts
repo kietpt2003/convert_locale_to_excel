@@ -14,7 +14,8 @@ import agentRoutes from './routes/agent.routes.js';
 import redmineRoutes from './routes/redmine.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import statsRoutes from './routes/stats.routes.js';
-import convertKeyRoutes from './routes/convertKey.routes.js'
+import convertKeyRoutes from './routes/convertKey.routes.js';
+import orderRoutes from './routes/order.routes.js';
 
 const app = express();
 const PORT = 3000;
@@ -97,6 +98,7 @@ app.use('/api/agent', agentRoutes);
 app.use('/api/redmine', redmineRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/convert-key', convertKeyRoutes);
+app.use('/api/orders', orderRoutes)
 
 app.use(express.static(path.resolve('src/public')));
 
