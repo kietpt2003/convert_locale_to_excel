@@ -1,13 +1,16 @@
 import { Router } from 'express';
 
 import { verifyToken } from '../middleware/validation.js';
-import { handleActivatePlan, handlePaypalSuccess } from '../controllers/order.controller.js';
+import {
+  handleActivatePlan,
+  handlePaypalSuccess,
+  handleSePayWebhook
+} from '../controllers/order.controller.js';
 
 const router = Router();
 
-router.use(verifyToken);
-
-router.post('/paypal-success', handlePaypalSuccess);
-router.post('/premium/activate-plan', handleActivatePlan);
+router.post('/paypal-success', verifyToken, handlePaypalSuccess);
+router.post('/premium/activate-plan', verifyToken, handleActivatePlan);
+router.post('/webhook/se-pay', handleSePayWebhook);
 
 export default router;

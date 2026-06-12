@@ -1,17 +1,20 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import dotenv from "dotenv";
 
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
 import { Order } from '../models/Order.js';
 import { PREMIUM_PLAN } from '../constants/premiumPlan.js';
 
+dotenv.config();
+
+const SEPAY_WEBHOOK_SECRET = process.env.SEPAY_WEBHOOK_SECRET || '';
+
 export const handlePaypalSuccess = async (req: any, res: Response): Promise<any> => {
   try {
     const { id: userId } = req.user;
     const { usdAmount, paypalDetails, planType } = req.body;
-
-    console.log('check body', req.body);
-
 
     // 1. Kiểm tra tính toàn vẹn của dữ liệu đầu vào
     if (!paypalDetails || !userId || !planType) {
@@ -182,5 +185,87 @@ export const handleActivatePlan = async (req: any, res: Response): Promise<any> 
       message: "Internal server error during trial activation process.",
       error: error.message
     });
+  }
+};
+
+export const handleSePayWebhook = async (req: Request, res: Response): Promise<any> => {
+  try {
+    // 2. ĐỌC CHỮ KÝ VÀ TIMESTAMP TỪ HEADERS DO SEPAY GỬI SANG
+    const signature = (req.headers['x-sepay-signature'] as string) || '';
+    const timestamp = (req.headers['x-sepay-timestamp'] as string) || '';
+    const payload = JSON.stringify(req.body);
+
+    // 3. THUẬT TOÁN XÁC THỰC HMAC-SHA256 ĐÚNG THEO MẪU CỦA SEPAY
+    const expected = 'sha256=' + crypto
+      .createHmac('sha256', SEPAY_WEBHOOK_SECRET)
+      .update(timestamp + '.' + payload)
+      .digest('hex');
+
+    // 🔒 CHẶN ĐỨNG HACKER: Nếu chữ ký không khớp, từ chối lệnh lập tức
+    if (signature !== expected) {
+      console.error('[SePay Webhook] Cảnh báo: Chữ ký giả mạo hoặc không hợp lệ!');
+      return res.status(401).send('Invalid signature');
+    }
+
+    // 4. BÓC TÁCH DỮ LIỆU GIAO DỊCH SAU KHI ĐÃ XÁC THỰC THÀNH CÔNG
+    // SePay gửi thông tin qua body, gồm: content (Nội dung CK), transferAmount (Số tiền nhận)...
+    const { content, transferAmount } = req.body;
+    console.log(`[SePay Webhook] Xác thực chuẩn! Nhận giao dịch: "${content}" - Số tiền: ${transferAmount} VND`);
+
+    // 5. TRÍCH XUẤT MÃ ĐƠN HÀNG TỪ NỘI DUNG CHUYỂN KHOẢN (Ví dụ cú pháp: "MYTOOL 652391")
+    const match = content.match(/MYTOOL\s+(\d+)/i);
+    if (!match) {
+      // Trả về 200 để SePay hiểu là hệ thống đã nhận, nhưng nội dung khách viết tay không thuộc diện khớp tự động
+      return res.status(200).json({ success: true, message: "Cú pháp không thuộc luồng tự động." });
+    }
+
+    const orderCode = match[1];
+
+    // 6. KIỂM TRA HÓA ĐƠN TRONG CƠ SỞ DỮ LIỆU (Database Check)
+    const order = await Order.findOne({ paypalOrderId: `VQR_${orderCode}` });
+    if (!order) {
+      return res.status(404).json({ success: false, message: "Hóa đơn không tồn tại trên hệ thống." });
+    }
+
+    // Chống xử lý trùng lặp nếu SePay gửi webhook nhiều lần (Idempotency)
+    if (order.status === "COMPLETED") {
+      return res.status(200).json({ success: true, message: "Đơn hàng này đã được kích hoạt trước đó." });
+    }
+
+    // 7. TÌM TÀI KHOẢN USER ĐỂ TIẾN HÀNH NÂNG CẤP VIP
+    const user = await AuthorizedUser.findById(order.userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Không tìm thấy User sở hữu đơn hàng." });
+    }
+
+    // 8. LOGIC TÍNH TOÁN CỘNG DỒN NGÀY GIA HẠN (Đồng bộ tuyệt đối với luồng PayPal)
+    const now = new Date();
+    let baseDate = (user.premiumValidUntil && new Date(user.premiumValidUntil) > now)
+      ? new Date(user.premiumValidUntil)
+      : now;
+
+    if (order.planType === "DAILY") baseDate.setDate(baseDate.getDate() + 1);
+    else if (order.planType === "MONTHLY") baseDate.setMonth(baseDate.getMonth() + 1);
+    else if (order.planType === "YEARLY") baseDate.setFullYear(baseDate.getFullYear() + 1);
+
+    // 9. ĐỒNG BỘ CẬP NHẬT TRẠNG THÁI VÀO CƠ SỞ DỮ LIỆU
+    user.premiumPlan = order.planType;
+    user.premiumValidUntil = order.planType === "LIFETIME" ? null : baseDate;
+    await user.save();
+
+    // Chuyển hóa đơn sang trạng thái thành công hoàn toàn
+    order.paypalCaptureId = "COMPLETED";
+    order.status = "COMPLETED";
+    await order.save();
+
+    // Trả về kết quả mỹ mãn cho phía SePay đóng kết nối
+    return res.status(200).json({
+      success: true,
+      message: `🎉 Kích hoạt thành công gói [${order.planType}] cho User: ${user.email}!`
+    });
+
+  } catch (error: any) {
+    console.error("Lỗi nghiêm trọng tại SePay Webhook Controller:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
