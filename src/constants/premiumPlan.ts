@@ -10,3 +10,10 @@ export const PREMIUM_PLAN = {
 export const PREMIUM_ERROR = {
   PREMIUM_REQUIRED: 'PREMIUM_REQUIRED'
 } as const
+
+export enum PREMIUM_PLAN_ENUM {
+  DAILY = "DAILY",
+  MONTHLY = "MONTHLY",
+  YEARLY = "YEARLY",
+  LIFETIME = "LIFETIME"
+};

@@ -1,15 +1,18 @@
 import mongoose, { Document, Schema } from "mongoose";
+import { ORDER_STATUS, PAYMENT_METHOD } from "../constants/order.js";
+import { PREMIUM_PLAN_ENUM } from "../constants/premiumPlan.js";
 
 // 1. Định nghĩa Interface định kiểu dữ liệu cho Document dữ liệu Order
 export interface IOrder extends Document {
   userId: mongoose.Types.ObjectId;
-  payerName: string;
-  payerEmail: string;
-  usdAmount: number;
-  planType: "DAILY" | "MONTHLY" | "YEARLY" | "LIFETIME";
-  paypalOrderId: string;
+  userName: string;
+  userEmail: string;
+  amount: number;
+  planType: PREMIUM_PLAN_ENUM;
+  orderId: string;
   paypalCaptureId: string;
-  status: "COMPLETED" | "FAILED" | "REFUNDED";
+  status: ORDER_STATUS;
+  paymentMethod: PAYMENT_METHOD;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,34 +22,39 @@ const orderSchema = new Schema<IOrder>(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "AuthorizedUser", // Liên kết chính xác với tên bảng User hiện tại của bạn
+      ref: "AuthorizedUser",
       required: true,
     },
-    payerName: {
+    userName: {
       type: String,
       required: true,
       trim: true,
     },
-    payerEmail: {
+    userEmail: {
       type: String,
       required: true,
       trim: true,
-      lowercase: true, // Tự động biến email sang chữ thường để dễ đồng bộ cứu dữ liệu
+      lowercase: true,
     },
-    usdAmount: {
+    amount: {
       type: Number,
       required: true,
     },
     planType: {
       type: String,
-      enum: ["DAILY", "MONTHLY", "YEARLY", "LIFETIME"], // Chỉ cho phép mua 4 gói trả phí này
+      enum: Object.values(PREMIUM_PLAN_ENUM),
       required: true,
     },
-    paypalOrderId: {
+    orderId: {
       type: String,
       required: true,
-      unique: true, // Khóa duy nhất toàn sàn để chặn đứng 100% việc hack spam gửi trùng hóa đơn
+      unique: true,
       trim: true,
+    },
+    paymentMethod: {
+      type: Number,
+      enum: Object.values(PAYMENT_METHOD).filter(value => typeof value === 'number'),
+      required: true
     },
     paypalCaptureId: {
       type: String,
@@ -54,13 +62,13 @@ const orderSchema = new Schema<IOrder>(
       trim: true,
     },
     status: {
-      type: String,
-      enum: ["COMPLETED", "FAILED", "REFUNDED"],
-      default: "COMPLETED", // Mặc định là hoàn thành vì Front-end đã capture thành công trước đó
+      type: Number,
+      enum: Object.values(ORDER_STATUS).filter(value => typeof value === 'number'),
+      default: ORDER_STATUS.COMPLETE,
     },
   },
   {
-    timestamps: true, // Tự động tạo và quản lý 2 cột dữ liệu thông minh: createdAt và updatedAt
+    timestamps: true,
   }
 );
 
