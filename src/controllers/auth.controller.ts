@@ -129,7 +129,10 @@ export const handleSignInV2 = async (req: Request, res: Response) => {
         email: payload.email,
         name: payload.name,
         picture: payload.picture,
-        role: authUser.role
+        role: authUser.role,
+        premiumPlan: authUser.premiumPlan,
+        premiumValidUntil: authUser.premiumValidUntil,
+        hasUsedTrial: authUser.hasUsedTrial
       },
       JWT_SECRET as string,
       { expiresIn: "1d" }
@@ -140,5 +143,52 @@ export const handleSignInV2 = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Auth error:", error);
     return redirectWithoutHistory('/#error=auth_failed');
+  }
+};
+
+export const getUserInfo = async (req: any, res: Response): Promise<any> => {
+  try {
+    // req.user được lấy từ middleware verifyToken giải mã từ JWT Token
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized. Token invalid or missing."
+      });
+    }
+
+    // Tìm user dưới Database để lấy thông tin gói Premium mới nhất
+    const user = await AuthorizedUser.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found in system."
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: user._id.toString(),
+        email: user.email,
+        role: user.role,
+        premiumPlan: user.premiumPlan,
+        premiumValidUntil: user.premiumValidUntil,
+        hasUsedTrial: user.hasUsedTrial,
+        // Name và picture thường nằm trong JWT Token từ Google truyền sang
+        name: req.user?.name || (user as any).name || "",
+        picture: req.user?.picture || (user as any).picture || ""
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Error in getUserInfo:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
   }
 };

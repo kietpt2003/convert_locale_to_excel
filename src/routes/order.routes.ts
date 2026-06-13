@@ -4,6 +4,7 @@ import { verifyToken } from '../middleware/validation.js';
 import {
   checkOrderStatus,
   createSePayQROrder,
+  getListOrders,
   handleActivatePlan,
   handlePaypalSuccess,
   handleSePayWebhook
@@ -16,5 +17,6 @@ router.post('/premium/activate-plan', verifyToken, handleActivatePlan);
 router.post('/webhook/se-pay', handleSePayWebhook);
 router.post('/se-pay', verifyToken, createSePayQROrder);
 router.get('/status/:orderCode', verifyToken, checkOrderStatus);
+router.get('/', verifyToken, getListOrders);
 
 export default router;
