@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { AuthorizedUser } from '../models/AuthorizedUser.js';
+import { USER_ROLE } from '../constants/const.js';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL;
@@ -49,7 +50,7 @@ export const handleSignIn = async (req: Request, res: Response) => {
 
     if (!authUser) {
       if (email === ADMIN_EMAIL) {
-        authUser = await AuthorizedUser.create({ email, role: "admin" });
+        authUser = await AuthorizedUser.create({ email, role: USER_ROLE.ADMIN });
       } else {
         return redirectWithoutHistory('/#error=access_denied');
       }
@@ -116,7 +117,7 @@ export const handleSignInV2 = async (req: Request, res: Response) => {
 
     if (!authUser) {
       if (email === ADMIN_EMAIL) {
-        authUser = await AuthorizedUser.create({ email, role: "admin" });
+        authUser = await AuthorizedUser.create({ email, role: USER_ROLE.ADMIN });
       } else {
         return redirectWithoutHistory('/#error=access_denied');
       }

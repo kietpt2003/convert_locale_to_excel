@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 
 import { AuthorizedUser } from "../models/AuthorizedUser.js";
 import { PREMIUM_ERROR, PREMIUM_PLAN } from "../constants/premiumPlan.js";
+import { USER_ROLE } from "../constants/const.js";
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
@@ -40,7 +41,7 @@ export const checkPremiumAccess = async (
 
     // 0. Trường hợp Super Admin -> Vượt qua gác cổng luôn
     const adminEmail = ADMIN_EMAIL;
-    if (user.email === adminEmail) {
+    if (user.email === adminEmail || user.role === USER_ROLE.SUPER_ADMIN) {
       return next();
     }
 

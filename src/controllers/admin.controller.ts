@@ -6,6 +6,7 @@ import { AuthorizedUser } from '../models/AuthorizedUser.js';
 import { RedmineAccount } from '../models/RedmineAccount.js';
 import { REDMINE_AUTHEN_ERROR } from '../constants/redmine.js';
 import { PREMIUM_PLAN } from '../constants/premiumPlan.js';
+import { USER_ROLE } from '../constants/const.js';
 
 dotenv.config();
 
@@ -42,7 +43,7 @@ export const createAdmin = async (req: Request, res: Response) => {
     const exists = await AuthorizedUser.exists({ email });
     if (exists) return res.status(400).json({ message: "Email existed" });
 
-    await AuthorizedUser.create({ email, role: role || "user" });
+    await AuthorizedUser.create({ email, role: role || USER_ROLE.USER });
     res.json({ message: "Add user success" });
   } catch (err) {
     res.status(500).json({ message: "Create user failed." });
@@ -67,7 +68,7 @@ export const deleteUser = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "User not found." });
     }
 
-    if (targetUser.role === "admin" && requesterEmail !== ADMIN_EMAIL) {
+    if (targetUser.role === USER_ROLE.ADMIN && requesterEmail !== ADMIN_EMAIL) {
       return res.status(403).json({ message: "Only Super Admin can delete other admin!" });
     }
 

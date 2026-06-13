@@ -1,9 +1,11 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 
+import { USER_ROLE } from "../constants/const.js";
+
 export const verifyAdmin = (req: Request, res: Response, next: any) => {
   const user = (req as any).user;
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== USER_ROLE.ADMIN && user.role !== USER_ROLE.SUPER_ADMIN)) {
     return res.status(403).json({ message: "Access denied." });
   }
   next();

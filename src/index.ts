@@ -18,7 +18,7 @@ import convertKeyRoutes from './routes/convertKey.routes.js';
 import orderRoutes from './routes/order.routes.js';
 
 const app = express();
-const PORT = 3000;
+const PORT = 3001;
 
 dotenv.config();
 app.use(cors());
