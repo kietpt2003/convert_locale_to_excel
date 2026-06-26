@@ -50,11 +50,14 @@ export const handleSignIn = async (req: Request, res: Response) => {
 
     if (!authUser) {
       if (email === ADMIN_EMAIL) {
-        authUser = await AuthorizedUser.create({ email, role: USER_ROLE.ADMIN });
+        authUser = await AuthorizedUser.create({ email, role: USER_ROLE.ADMIN, lastLoginAt: new Date() });
       } else {
         return redirectWithoutHistory('/#error=access_denied');
       }
     }
+
+    authUser.lastLoginAt = new Date();
+    await authUser.save();
 
     // Generate Custom JWT Token của bạn
     const customToken = jwt.sign(
@@ -117,11 +120,14 @@ export const handleSignInV2 = async (req: Request, res: Response) => {
 
     if (!authUser) {
       if (email === ADMIN_EMAIL) {
-        authUser = await AuthorizedUser.create({ email, role: USER_ROLE.ADMIN });
+        authUser = await AuthorizedUser.create({ email, role: USER_ROLE.ADMIN, lastLoginAt: new Date() });
       } else {
         return redirectWithoutHistory('/#error=access_denied');
       }
     }
+
+    authUser.lastLoginAt = new Date();
+    await authUser.save();
 
     // Generate Custom JWT Token
     const customToken = jwt.sign(
@@ -180,7 +186,8 @@ export const getUserInfo = async (req: any, res: Response): Promise<any> => {
         hasUsedTrial: user.hasUsedTrial,
         // Name và picture thường nằm trong JWT Token từ Google truyền sang
         name: req.user?.name || (user as any).name || "",
-        picture: req.user?.picture || (user as any).picture || ""
+        picture: req.user?.picture || (user as any).picture || "",
+        lastLoginAt: user.lastLoginAt
       }
     });
 

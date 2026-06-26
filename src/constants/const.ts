@@ -1,3 +1,5 @@
+import { JwtPayload } from "jsonwebtoken";
+
 export const IGNORE_ENDPOINT = [
   "/api/stats/visits",
   "/api/convert-key/blob-token",
@@ -10,3 +12,16 @@ export const USER_ROLE = {
   ADMIN: 'admin',
   USER: 'user'
 };
+
+export const UPDATE_COOLDOWN_SECONDS = 5 * 60;
+
+export interface CustomJwtPayload extends JwtPayload {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  role: string;
+  premiumPlan: string;
+  premiumValidUntil?: Date,
+  hasUsedTrial: boolean;
+}

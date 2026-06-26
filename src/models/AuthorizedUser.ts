@@ -18,6 +18,10 @@ const authorizedUserSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  lastLoginAt: {
+    type: Date,
+    default: null
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

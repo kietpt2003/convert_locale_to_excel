@@ -26,7 +26,8 @@ export const getAdminInfo = async (_req: Request, res: Response) => {
       isSuperAdmin: u.email === adminEmail,
       hasUsedTrial: u.hasUsedTrial,
       premiumPlan: u.premiumPlan,
-      premiumValidUntil: u.premiumValidUntil
+      premiumValidUntil: u.premiumValidUntil,
+      lastLoginAt: u.lastLoginAt
     }));
 
     res.json(formattedUsers);

@@ -39,6 +39,9 @@ export const checkPremiumAccess = async (
       });
     }
 
+    user.lastLoginAt = new Date();
+    await user.save();
+
     // 0. Trường hợp Super Admin -> Vượt qua gác cổng luôn
     const adminEmail = ADMIN_EMAIL;
     if (user.email === adminEmail || user.role === USER_ROLE.SUPER_ADMIN) {
