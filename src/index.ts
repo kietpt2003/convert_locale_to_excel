@@ -18,6 +18,8 @@ import convertKeyRoutes from './routes/convertKey.routes.js';
 import orderRoutes from './routes/order.routes.js';
 
 const app = express();
+// @vercel/node reads this static export for the existing legacy builds entry.
+export const config = { maxDuration: 300 };
 const PORT = 3001;
 
 dotenv.config();

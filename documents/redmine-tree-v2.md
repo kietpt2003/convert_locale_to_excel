@@ -14,6 +14,14 @@ the API again when reopened; a module-level browser cache cannot suppress the
 freshness check. Request cancellation on `my-only-tool` prevents obsolete browser
 responses from replacing the selected scope.
 
+Filter selections are remembered as soon as the checkbox changes, even if that
+request fails or is cancelled. The web no longer reuses a module-level task list
+across Explorer mounts. Requests use the current scope ref explicitly, so Sync
+after an error/remount cannot silently fall back to recent-only mode. Turning
+the two-month filter off, or pressing Sync Now while it is off, forces a full
+all-date fetch (`fullReload=true`). Late responses from abandoned scopes cannot
+replace the current list.
+
 Both web Explorers default to the enabled "Created: Last 2 Months" filter. The
 checkbox can be turned off to load all dates. The cutoff is two calendar months
 before the current UTC date, clamped to the final day of a shorter month; it is
@@ -26,6 +34,9 @@ Redmine URL, API key, Only My Tasks scope and optional creation cutoff. Recent a
 all-time snapshots are separate. A new cutoff date starts a separate snapshot,
 so tasks that age out cannot remain indefinitely in the rolling window. Search/compact responses are built
 after synchronization, so searches cannot corrupt the stored baseline.
+Snapshot format/key namespace is now v2. Stored snapshots carry their exact scope
+key and are rejected if it does not match the requested scope. Legacy snapshots
+without provenance are rebuilt instead of being trusted.
 
 Subsequent calls fetch current projects and issues updated since the previous
 watermark, merge issues by ID, validate the total, then rebuild the tree. The
@@ -64,7 +75,8 @@ snapshot isolation; changes during a multi-page scan may require another reload.
 
 ## Parameters and diagnostics
 
-- `reload`: retained for compatibility; every request revalidates upstream.
+- `reload`: every request revalidates upstream; true with the recent filter off
+  forces a complete all-date rebuild.
 - `fullReload=true`: explicitly rebuild the complete snapshot.
 - `onlyShowMyTasks=true`: restrict to assigned-to-me tasks. Leave false to include
   other people's and unassigned tasks.
@@ -79,12 +91,26 @@ snapshot isolation; changes during a multi-page scan may require another reload.
 
 `REDMINE_TREE_CONCURRENCY` defaults to 1 (range 1–32). Live tuning showed that
 raising concurrency can slow this Redmine instance substantially. Request timeout
-is 20 seconds and upstream work has a 60-second deadline. A finite per-load
+is 20 seconds. The request budget, including queue time, is 110 seconds. A finite per-load
 AbortSignal listener budget matches the request budget without changing global
 limits. Errors log timing/code/status without Axios config or credentials.
+The Node response close event aborts abandoned scans; cancelled queued requests
+reject immediately and never start another Redmine scan.
+
+`vercel.json` explicitly enables Fluid compute; the static `config` export in
+`src/index.ts` sets the function duration to 300 seconds, leaving room for the
+request budget and response overhead. The existing legacy builds entry/routes
+are retained. These settings take effect only after redeploying the server.
+Vercel documents Fluid configuration and duration limits at
+https://vercel.com/docs/fluid-compute and
+https://vercel.com/docs/functions/configuring-functions/duration.
 
 `X-Redmine-Sync` reports `FULL` or `DELTA`; `X-Redmine-Cache: REVALIDATED` means
-the response checked upstream. `Server-Timing` includes server lookup, sync and
+the response checked upstream. `X-Redmine-Scope` identifies all/mine and the exact
+creation cutoff or `all-dates`, including error responses after scope resolution.
+Timeout JSON distinguishes `REDMINE_SYNC_DEADLINE` from
+`REDMINE_UPSTREAM_TIMEOUT`; a Vercel platform timeout instead has platform headers.
+`Server-Timing` includes server lookup, sync and
 tree building, but excludes response serialization, download and rendering.
 
 ## Validation
@@ -98,26 +124,38 @@ Authenticated live HTTP checks against the configured administrator's Redmine:
 
 | Mode | Sync | HTTP | Duration | Returned tasks |
 | --- | --- | --- | --- | --- |
-| Two-month filter enabled, initial snapshot | FULL | 200 | 9.8 s | 2,102 |
-| Two-month filter enabled, reload | DELTA | 200 | 3.2 s | 2,102 |
-| Filter disabled, all dates | FULL | 200 | 33.9 s | 7,527 |
-| Filter re-enabled after all dates | DELTA | 200 | 2.9 s | 2,102 |
-| Two months and Only My Tasks | FULL | 200 | 0.94 s | 65 |
-| Two months and Only My Tasks, reload | DELTA | 200 | 0.95 s | 65 |
+| Two-month filter enabled, initial snapshot | FULL | 200 | 9.9 s | 2,103 |
+| Filter disabled, all dates | FULL | 200 | 33.4 s | 7,528 |
+| Sync Now again with filter disabled | FULL | 200 | 33.5 s | 7,528 |
+| Filter re-enabled after all dates | DELTA | 200 | 3.1 s | 2,103 |
 
-The compact payload dropped from 2,154,769 bytes to 596,291 bytes (about 72%).
+These latest measurements use the fixed server locally against the actual
+Redmine. Before the fix, direct production API scope tests also returned HTTP
+200 and the expected counts; the intermittent 504 was not reproduced in that
+run. Runtime-log access via the Vercel connector returned a team authorization
+error, so its exact production cause remains unconfirmed. The new deployment
+settings have not been published or verified on Vercel.
 
 The HTTP regression fixture creates a task from another author with no assignee
 between loads and verifies it appears after delta reload while the two-month
 filter is enabled. Disabling the filter restores the older parent and nesting;
 re-enabling returns only recent tasks. Tests also check month-end/leap-year
-cutoffs, scope isolation and no assignee restriction in all-task mode. All 22
+cutoffs, snapshot provenance, cancellation while queued, scope isolation and no
+assignee restriction in all-task mode. All 24
 tests pass. No real Redmine task was created or
 modified for testing. Other tests cover failure/retry, deletion/count mismatch,
 project access changes, expiry, clock fallback, overlapping reloads, snapshot
 compression and listener cleanup with actual Axios HTTP requests.
 
-The existing Chrome tab cannot be controlled while JavaScript from Apple Events
-is disabled. Live verification covers HTTP, server middleware, Redis and Redmine;
-direct browser interaction has not been verified. Web TypeScript and production
+An additional real React DOM smoke test loads the actual web component and API
+service in jsdom. It verifies default recent mode, disabling the filter, a 504,
+remount, Sync all, rapid toggles and an out-of-order recent response. To run it
+without adding dependencies to either repository:
+
+```sh
+npm install --prefix /private/tmp/redmine-scope-ui-check --no-package-lock --ignore-scripts jsdom@26.1.0
+node --require ../my-only-tool/.pnp.cjs tests/webExplorerScope.smoke.cjs ../my-only-tool /private/tmp/redmine-scope-ui-check/node_modules/jsdom
+```
+
+Direct Chrome interaction/layout has not been verified. Web TypeScript and production
 Webpack build pass; Webpack retains existing bundle/image size warnings.

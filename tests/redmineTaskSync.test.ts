@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { getEventListeners } from 'node:events';
 import { decodeSnapshot, encodeSnapshot, FULL_RECONCILE_MS, serializeTaskSync, snapshotKey, synchronizeTasks, type SyncSource, type TaskSnapshot } from '../src/utils/redmineTaskSync.js';
 import { buildProjectTaskTree, treeIssueCountParams, treeIssueParams, twoMonthsAgo, type TreeFilters } from '../src/utils/redmineTreeV2.js';
 
 const now = Date.parse('2026-10-30T10:00:00Z');
 const projects = [{ id: 1, name: 'Project' }];
 const oldTask = { id: 1, subject: 'Existing', project: { id: 1 }, updated_on: '2026-10-30T09:59:00Z' };
-const baseline = (): TaskSnapshot => ({ version: 1, projects, tasks: [oldTask], syncedAt: new Date(now - 1000).toISOString(), reconciledAt: now - 1000 });
+const baseline = (): TaskSnapshot => ({ version: 2, projects, tasks: [oldTask], syncedAt: new Date(now - 1000).toISOString(), reconciledAt: now - 1000 });
 const filters: TreeFilters = { onlyShowMyTasks: false, taskDate: '', taskName: '', projectName: '', compact: true };
 const source = (tasks: any[], count = 1): SyncSource => ({
   projects: async () => ({ items: projects, serverDate: new Date(now).toUTCString() }),
@@ -160,4 +161,34 @@ test('snapshots compress, round-trip, and reject corrupt cache data', async () =
   assert.equal(await decodeSnapshot('broken'), undefined);
   assert.equal(await decodeSnapshot(null), undefined);
   assert.equal(await decodeSnapshot(JSON.stringify({ payload: 'invalid' })), undefined);
+});
+
+test('snapshot provenance rejects recent data under an all-dates key and invalidates v1 snapshots', async () => {
+  const allKey = snapshotKey('host', 'key', false);
+  const recentKey = snapshotKey('host', 'key', false, '2026-08-31');
+  const recent = { ...baseline(), scope: recentKey };
+  const encoded = await encodeSnapshot(recent, now);
+  assert.equal(await decodeSnapshot(encoded, allKey), undefined);
+  assert.deepEqual(await decodeSnapshot(encoded, recentKey), recent);
+  assert.equal(await decodeSnapshot(await encodeSnapshot(baseline(), now), allKey), undefined);
+  const all = { ...baseline(), scope: allKey };
+  assert.deepEqual(await decodeSnapshot(await encodeSnapshot(all, now), allKey), all);
+  assert.equal(await decodeSnapshot(await encodeSnapshot({ ...all, version: 1 } as any, now), allKey), undefined);
+});
+
+test('a request cancelled while queued rejects immediately and never starts an abandoned scan', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const first = serializeTaskSync('cancel-queue', () => gate);
+  const controller = new AbortController();
+  let ran = false;
+  const second = serializeTaskSync('cancel-queue', async () => { ran = true; }, controller.signal);
+  controller.abort();
+  await assert.rejects(second, { name: 'AbortError' });
+  assert.equal(ran, false);
+  assert.equal(getEventListeners(controller.signal, 'abort').length, 0);
+  release();
+  await first;
+  assert.equal(await serializeTaskSync('cancel-queue', async () => 42), 42);
+  assert.equal(ran, false);
 });

@@ -4,7 +4,8 @@ import { promisify } from 'node:util';
 
 type Data = Record<string, any>;
 export type TaskSnapshot = {
-  version: 1;
+  version: 2;
+  scope?: string;
   projects: Data[];
   tasks: Data[];
   syncedAt: string;
@@ -26,7 +27,7 @@ const OVERLAP_MS = 24 * 60 * 60_000 + 2 * 60_000;
 export function snapshotKey(url: string, apiKey: string, mine: boolean, createdSince?: string) {
   const scope: Array<string | boolean> = [url, apiKey, mine];
   if (createdSince) scope.push(createdSince);
-  return `redmine:snapshot:v1:${createHash('sha256').update(JSON.stringify(scope)).digest('hex')}`;
+  return `redmine:snapshot:v2:${createHash('sha256').update(JSON.stringify(scope)).digest('hex')}`;
 }
 
 export async function encodeSnapshot(snapshot: TaskSnapshot, generation: number) {
@@ -34,12 +35,13 @@ export async function encodeSnapshot(snapshot: TaskSnapshot, generation: number)
   return JSON.stringify({ generation, payload });
 }
 
-export async function decodeSnapshot(value: string | null | undefined): Promise<TaskSnapshot | undefined> {
+export async function decodeSnapshot(value: string | null | undefined, expectedScope?: string): Promise<TaskSnapshot | undefined> {
   if (!value) return;
   try {
     const { payload } = JSON.parse(value);
     const snapshot = JSON.parse((await decompress(Buffer.from(payload, 'base64'), { maxOutputLength: 64 * 1024 * 1024 })).toString());
-    if (snapshot.version !== 1 || !Array.isArray(snapshot.projects) || !Array.isArray(snapshot.tasks)
+    if (snapshot.version !== 2 || (expectedScope && snapshot.scope !== expectedScope)
+      || !Array.isArray(snapshot.projects) || !Array.isArray(snapshot.tasks)
       || !Number.isFinite(Date.parse(snapshot.syncedAt)) || !Number.isFinite(snapshot.reconciledAt)) return;
     return snapshot;
   } catch { return; }
@@ -48,11 +50,19 @@ export async function decodeSnapshot(value: string | null | undefined): Promise<
 // Each reload checks upstream after the previous reload finishes. Merely joining
 // an older in-flight scan could miss a task created before the later reload.
 const queues = new Map<string, Promise<unknown>>();
-export function serializeTaskSync<T>(key: string, work: () => Promise<T>): Promise<T> {
+export function serializeTaskSync<T>(key: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   const previous = queues.get(key) || Promise.resolve();
-  const job = previous.catch(() => undefined).then(work);
+  const job = previous.catch(() => undefined).then(() => { signal?.throwIfAborted(); return work(); });
   queues.set(key, job);
-  return job.finally(() => { if (queues.get(key) === job) queues.delete(key); });
+  const completion = job.finally(() => { if (queues.get(key) === job) queues.delete(key); });
+  if (!signal) return completion;
+  let cancel: () => void;
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    cancel = () => reject(signal.reason);
+    if (signal.aborted) cancel();
+    else signal.addEventListener('abort', cancel, { once: true });
+  });
+  return Promise.race([completion, cancelled]).finally(() => signal.removeEventListener('abort', cancel));
 }
 
 export async function synchronizeTasks(
@@ -91,7 +101,7 @@ export async function synchronizeTasks(
   tasks = tasks.filter(task => projectIds.has(task.project?.id)).sort((a, b) => b.id - a.id);
   return {
     mode: full ? 'FULL' : 'DELTA',
-    snapshot: { version: 1, projects, tasks, syncedAt, reconciledAt: full ? now : previous!.reconciledAt },
+    snapshot: { version: 2, projects, tasks, syncedAt, reconciledAt: full ? now : previous!.reconciledAt },
   };
 }
 
