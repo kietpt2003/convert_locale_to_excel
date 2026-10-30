@@ -17,6 +17,7 @@ import {
   getUserInfo,
   logTime,
   getProjectTaskTree,
+  getProjectTaskTreeOptimizedV2,
   setupRedmineAccount,
   getUsersFromReportHTML,
   getNewTaskOptions,
@@ -47,6 +48,7 @@ router.get('/projects', getListProjects);
 router.get('/user/me', getUserInfo);
 router.post('/user/redmine-config', getRedmineConfig);
 router.get('/projects/tasks', getProjectTaskTree);
+router.get('/v2/projects/tasks', getProjectTaskTreeOptimizedV2);
 router.post('/login', setupRedmineAccount);
 router.get('/user/all', redmineInterceptor, getUsersFromReportHTML);
 router.get('/projects/:project_id/task-options', redmineInterceptor, getNewTaskOptions);

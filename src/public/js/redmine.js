@@ -681,20 +681,20 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
 export async function loadFullProjectTree(forceReload = false) {
   const container = document.getElementById("projectTreeContainer");
   const isOnlyMine = document.getElementById("chkOnlyMyTasks").checked;
+  const recentOnly = document.getElementById("chkRecentTasks").checked;
 
   if (forceReload) {
     globalProjectTreeData = null;
   }
 
-  // 1. CHỈ GỌI API NẾU CHƯA CÓ DỮ LIỆU GỐC
-  if (!globalProjectTreeData) {
+  // Mỗi lần mở hoặc tải lại đều kiểm tra thay đổi mới nhất qua Redmine.
+  {
     container.style.opacity = "0.5";
     const iconSvg = document.getElementById("iconReloadTree");
+    let waitTimeout;
 
     try {
       if (iconSvg) iconSvg.style.animation = "spin 1s linear infinite";
-
-      let waitTimeout;
 
       waitTimeout = setTimeout(() => {
         container.innerHTML =
@@ -702,8 +702,9 @@ export async function loadFullProjectTree(forceReload = false) {
       }, 15000);
 
       const response = await fetchWithAuth(
-        `/api/redmine/projects/tasks?reload=${forceReload}&onlyShowMyTasks=${isOnlyMine}`,
+        `/api/redmine/v2/projects/tasks?reload=${forceReload}&onlyShowMyTasks=${isOnlyMine}&recentOnly=${recentOnly}&compact=true`,
       );
+      if (!response.ok) throw new Error('Failed to refresh Redmine tasks');
 
       clearTimeout(waitTimeout);
 
@@ -722,7 +723,9 @@ export async function loadFullProjectTree(forceReload = false) {
       document.getElementById("lastUpdatedTime").innerText = timeString;
     } catch (error) {
       container.innerHTML = '<div class="error-state">Error loading data</div>';
+      return;
     } finally {
+      clearTimeout(waitTimeout);
       if (iconSvg) iconSvg.style.animation = "none";
       container.style.opacity = "1"; // Trả lại độ sáng
     }
@@ -930,6 +933,10 @@ document
 
     container.style.opacity = "1";
   });
+
+document
+  .getElementById("chkRecentTasks")
+  .addEventListener("change", () => loadFullProjectTree(true));
 
 export function showLoadingOverlay(
   message = "It's being processed, please wait...",

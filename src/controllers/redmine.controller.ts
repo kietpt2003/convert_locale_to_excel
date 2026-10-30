@@ -10,6 +10,8 @@ import { AuthorizedUser } from '../models/AuthorizedUser.js';
 import { fetchRedmineDataParallel, getTotalLoggedHours, normalizeUrl } from '../utils/redmineUtils.js';
 import { RedmineAccount } from '../models/RedmineAccount.js';
 import { getRedisClient } from '../index.js';
+import { buildProjectTaskTree, createRequestPool, createTreeAbortController, fetchCollection, treeIssueCountParams, treeIssueParams, twoMonthsAgo, type TreeFilters } from '../utils/redmineTreeV2.js';
+import { decodeSnapshot, encodeSnapshot, SAVE_SNAPSHOT_SCRIPT, serializeTaskSync, snapshotKey, synchronizeTasks } from '../utils/redmineTaskSync.js';
 
 dotenv.config();
 
@@ -572,6 +574,114 @@ export const getRedmineConfig = async (req: any, res: Response) => {
     res.status(500).json({ message: "Failed to save configuration" });
   }
 }
+
+export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => {
+  const started = performance.now();
+  try {
+    const account = await getRedmineAccount(req.user.email);
+    if (!account?.redmineApiKey || !account.redmineUrl) {
+      return res.status(400).json({ message: 'Missing Redmine Configuration' });
+    }
+    const filters: TreeFilters = {
+      onlyShowMyTasks: req.query.onlyShowMyTasks === 'true',
+      projectName: String(req.query.projectName || ''),
+      taskName: String(req.query.taskName || ''),
+      taskDate: String(req.query.taskDate || ''),
+      compact: req.query.compact === 'true',
+      createdSince: req.query.recentOnly === 'true' && !req.query.taskDate ? twoMonthsAgo() : undefined,
+    };
+    const url = normalizeUrl(account.redmineUrl);
+    const key = snapshotKey(url, account.redmineApiKey, filters.onlyShowMyTasks, filters.createdSince);
+    // Cache outages must not prevent access to Redmine. Bound cache latency too.
+    const cacheOperation = async <T,>(operation: () => Promise<T>): Promise<T | undefined> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          operation(),
+          new Promise<undefined>(resolve => { timer = setTimeout(() => resolve(undefined), 1000); }),
+        ]);
+      } catch {
+        return undefined;
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    let syncMode = 'FULL';
+    const tree = await serializeTaskSync(key, async () => {
+      const generation = Date.now();
+      // This Redmine instance slows down under parallel issue scans; live tests
+      // were faster with one request. Higher-capacity hosts can opt in via env.
+      const configured = Number(process.env.REDMINE_TREE_CONCURRENCY || 1);
+      const concurrency = Number.isFinite(configured) ? Math.max(1, Math.min(32, Math.floor(configured))) : 1;
+      const pool = createRequestPool(concurrency);
+      const abort = createTreeAbortController(concurrency);
+      const deadline = setTimeout(() => abort.abort(), 60_000);
+      try {
+        let serverDate: string | undefined;
+        const getProjects = async () => ({
+          items: await fetchCollection(`${url}/projects.json`, account.redmineApiKey,
+            { status: REDMINE_PROJECT_STATUS.ACTIVE }, 'projects', pool, concurrency, abort.signal,
+            date => { serverDate = date; }),
+          serverDate,
+        });
+        // Preserve arbitrary created_on operators by sending dated searches
+        // directly to Redmine rather than approximating them in local storage.
+        if (filters.taskDate) {
+          const { items: projects } = await getProjects();
+          const tasks = projects.length ? await fetchCollection(`${url}/issues.json`, account.redmineApiKey,
+            treeIssueParams(filters, projects), 'issues', pool, concurrency, abort.signal) : [];
+          return buildProjectTaskTree(projects, tasks, filters);
+        }
+        const previous = await decodeSnapshot(await cacheOperation(async () => (await getRedisClient()).get(key)));
+        const baseFilters = { ...filters, taskName: '', projectName: '', compact: false };
+        const { snapshot, mode } = await synchronizeTasks(previous, {
+          projects: getProjects,
+          tasks: (projects, since) => fetchCollection(`${url}/issues.json`, account.redmineApiKey,
+            treeIssueParams(baseFilters, projects, since), 'issues', pool, concurrency, abort.signal),
+          count: projects => pool(async () => {
+            const { data } = await axios.get(`${url}/issues.json`, {
+              headers: { 'X-Redmine-API-Key': account.redmineApiKey },
+              params: { ...treeIssueCountParams(baseFilters, projects), limit: 1, offset: 0 },
+              timeout: 20_000, signal: abort.signal,
+            });
+            if (!Number.isInteger(data.total_count) || data.total_count < 0) throw new Error('Invalid Redmine issue count');
+            return data.total_count;
+          }),
+        }, req.query.fullReload === 'true');
+        // Save only after projects, every delta page and validation succeed.
+        const encoded = await encodeSnapshot(snapshot, generation);
+        await cacheOperation(async () => (await getRedisClient()).eval(SAVE_SNAPSHOT_SCRIPT, {
+          keys: [key], arguments: [encoded, String(generation)],
+        }));
+        syncMode = mode;
+        return buildProjectTaskTree(snapshot.projects, snapshot.tasks, filters);
+      } finally {
+        clearTimeout(deadline);
+        abort.abort();
+      }
+    });
+    res.set('Cache-Control', 'private, no-store');
+    res.set('Server-Timing', `tree;dur=${(performance.now() - started).toFixed(1)}`);
+    res.set('X-Redmine-Cache', 'REVALIDATED');
+    res.set('X-Redmine-Sync', syncMode);
+    return res.json(tree);
+  } catch (error: any) {
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    const timedOut = axios.isAxiosError(error) && (error.code === 'ERR_CANCELED' || error.code === 'ECONNABORTED');
+    console.error('[Redmine tree v2] Load failed', {
+      durationMs: Math.round(performance.now() - started),
+      code: axios.isAxiosError(error) ? error.code : undefined,
+      upstreamStatus: status,
+      // Never log Axios request config, which contains the user's API key.
+      message: axios.isAxiosError(error) ? undefined : error.message,
+    });
+    return res.status(status === 401 || status === 403 ? status : timedOut ? 504 : 502).json({
+      message: status === 401 || status === 403
+        ? 'Redmine authentication or permission failed'
+        : timedOut ? 'Redmine task loading timed out; please retry' : 'Failed to get projects tasks v2; please retry',
+    });
+  }
+};
 
 export const getProjectTaskTree = async (req: any, res: Response) => {
   try {
