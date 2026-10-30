@@ -498,6 +498,11 @@ export function highlightText(text, query) {
   return text.replace(regex, '<mark class="highlight-text">$1</mark>');
 }
 
+function countProjectTasks(project) {
+  const countTasks = tasks => tasks.reduce((sum, task) => sum + 1 + countTasks(task.subtasks || []), 0);
+  return countTasks(project.tasks || []) + (project.subProjects || []).reduce((sum, child) => sum + countProjectTasks(child), 0);
+}
+
 function renderProjectNodes(projects, parentElement, pQuery, tQuery) {
   projects.forEach((proj) => {
     const li = document.createElement("li");
@@ -523,7 +528,7 @@ function renderProjectNodes(projects, parentElement, pQuery, tQuery) {
           [<a href="${projectLink}" target="_blank" class="project-id-link" onclick="event.stopPropagation()">#${highlightedProjectId}</a>] 
           ${highlightedName}
         </span>
-        <span class="badge">${proj.tasks ? proj.tasks.length : 0} tasks</span>
+        <span class="badge" title="Includes subtasks and subprojects">${countProjectTasks(proj)} tasks</span>
       </div>
       <ul class="sub-tree"></ul>
     `;
@@ -682,6 +687,7 @@ export async function loadFullProjectTree(forceReload = false) {
   const container = document.getElementById("projectTreeContainer");
   const isOnlyMine = document.getElementById("chkOnlyMyTasks").checked;
   const recentOnly = document.getElementById("chkRecentTasks").checked;
+  const includeInactiveProjects = document.getElementById("chkInactiveProjects").checked;
 
   if (forceReload) {
     globalProjectTreeData = null;
@@ -702,7 +708,7 @@ export async function loadFullProjectTree(forceReload = false) {
       }, 15000);
 
       const response = await fetchWithAuth(
-        `/api/redmine/v2/projects/tasks?reload=${forceReload}&onlyShowMyTasks=${isOnlyMine}&recentOnly=${recentOnly}&compact=true`,
+        `/api/redmine/v2/projects/tasks?reload=${forceReload}&onlyShowMyTasks=${isOnlyMine}&recentOnly=${recentOnly}&includeInactiveProjects=${includeInactiveProjects}&compact=true`,
       );
       if (!response.ok) throw new Error('Failed to refresh Redmine tasks');
 
@@ -936,6 +942,10 @@ document
 
 document
   .getElementById("chkRecentTasks")
+  .addEventListener("change", () => loadFullProjectTree(true));
+
+document
+  .getElementById("chkInactiveProjects")
   .addEventListener("change", () => loadFullProjectTree(true));
 
 export function showLoadingOverlay(

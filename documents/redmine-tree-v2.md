@@ -19,7 +19,9 @@ request fails or is cancelled. The web no longer reuses a module-level task list
 across Explorer mounts. Requests use the current scope ref explicitly, so Sync
 after an error/remount cannot silently fall back to recent-only mode. Turning
 the two-month filter off, or pressing Sync Now while it is off, forces a full
-all-date fetch (`fullReload=true`). Late responses from abandoned scopes cannot
+all-date fetch (`fullReload=true`). All-date requests also force full scans on
+the server regardless of `reload`, so neither `created_on` nor `updated_on` is
+sent in ALL mode. Late responses from abandoned scopes cannot
 replace the current list.
 
 Both web Explorers default to the enabled "Created: Last 2 Months" filter. The
@@ -28,13 +30,22 @@ before the current UTC date, clamped to the final day of a shorter month; it is
 based on `created_on`, not `updated_on`. Filtering happens at Redmine, not after
 downloading all tasks. It combines with Only My Tasks when that box is checked.
 
+Both webs also provide "Include Inactive Projects", default **false**. Off loads
+only active project tasks; on additionally includes closed/archived projects the
+account can access. This checkbox is independent of the date and assignee boxes.
+Its value is sent explicitly as `includeInactiveProjects` and is part of the
+snapshot scope. Active-only issue scans and count checks use the same native
+project-ID filter; an empty active-project list returns no tasks without issuing
+an invalid empty-ID query. Explicit custom `taskDate` searches are filtered to
+active projects when building the response.
+
 The first call loads the complete list within the selected date range. A gzip-compressed snapshot in the existing
 Redis stores projects, raw tasks, and synchronization timestamps. Keys hash the
 Redmine URL, API key, Only My Tasks scope and optional creation cutoff. Recent and
 all-time snapshots are separate. A new cutoff date starts a separate snapshot,
 so tasks that age out cannot remain indefinitely in the rolling window. Search/compact responses are built
 after synchronization, so searches cannot corrupt the stored baseline.
-Snapshot format/key namespace is now v2. Stored snapshots carry their exact scope
+Snapshot format/key namespace is now v3. Stored snapshots carry their exact scope
 key and are rejected if it does not match the requested scope. Legacy snapshots
 without provenance are rebuilt instead of being trusted.
 
@@ -46,10 +57,15 @@ query uses a date with a previous-day overlap for timezone safety. Repeated issu
 are deduplicated by ID. A missing HTTP Date retains the older watermark instead
 of advancing it using a potentially skewed local clock.
 
-All-task queries have no assignee or author restriction: another person's newly
+Queries without Only My Tasks have no assignee or author restriction: another person's newly
 created, unassigned task appears after reload if the account can see it and its
-project is active. Only My Tasks explicitly retains `assigned_to_id=me` and has
-a separate snapshot. New project access triggers a full scan to include older
+project is in the selected active/inactive scope. Only My Tasks explicitly retains `assigned_to_id=me` and has
+a separate snapshot. When inactive projects are included, the issues API is authoritative: queries do not restrict
+`project_id` to the projects listed by a separate endpoint. Project metadata is
+fetched for active (1), closed (5), and archived (9) states; `status='*' on the
+projects endpoint is unsupported by this installation. If a visible issue refers
+to an unlisted project, its own project metadata is used to retain the task as a
+root project instead of silently discarding it. New project access triggers a full scan to include older
 issues that have not themselves been updated recently.
 
 Reloads for the same snapshot are serialized, not joined to an older in-flight
@@ -69,17 +85,19 @@ this is not permission to serve it without checking Redmine.
 
 Initial loads, expired reconciliation intervals, changed project access, and count
 mismatches still require a full scan of the selected date range. Live measurements
-were 9.8 seconds with the two-month filter enabled versus 33.9 seconds for all dates.
+were 9.7 seconds with the two-month filter enabled versus 49.7 seconds for all dates.
 Incremental reloads are much faster. Redmine offset pagination has no
 snapshot isolation; changes during a multi-page scan may require another reload.
 
 ## Parameters and diagnostics
 
-- `reload`: every request revalidates upstream; true with the recent filter off
-  forces a complete all-date rebuild.
+- `reload`: every request revalidates upstream. With the recent filter off, the
+  server always performs a complete all-date scan without date parameters.
 - `fullReload=true`: explicitly rebuild the complete snapshot.
 - `onlyShowMyTasks=true`: restrict to assigned-to-me tasks. Leave false to include
   other people's and unassigned tasks.
+- `includeInactiveProjects=true`: include closed/archived projects. Default false
+  restricts results to active project tasks, independently of the date filter.
 - `recentOnly=true`: restrict `created_on` to the last two calendar months in
   full scans, delta scans and count checks. Both webs send true by default.
   False/omitted keeps all dates for compatibility with existing API clients.
@@ -124,10 +142,25 @@ Authenticated live HTTP checks against the configured administrator's Redmine:
 
 | Mode | Sync | HTTP | Duration | Returned tasks |
 | --- | --- | --- | --- | --- |
-| Two-month filter enabled, initial snapshot | FULL | 200 | 9.9 s | 2,103 |
-| Filter disabled, all dates | FULL | 200 | 33.4 s | 7,528 |
-| Sync Now again with filter disabled | FULL | 200 | 33.5 s | 7,528 |
-| Filter re-enabled after all dates | DELTA | 200 | 3.1 s | 2,103 |
+| Two-month filter enabled, inactive included, initial snapshot | FULL | 200 | 9.7 s | 2,124 |
+| Date filter disabled, inactive included | FULL | 200 | 49.7 s | 10,940 |
+| Date filter re-enabled, inactive included | DELTA | 200 | 3.2 s | 2,124 |
+
+Inactive checkbox live toggle verification (two-month date filter enabled):
+
+| Include inactive | Projects | Tasks | HTTP | Sync duration |
+| --- | --- | --- | --- | --- |
+| false (default) | 41 | 2,103 | 200 | 3.10 s (delta) |
+| true | 69 | 2,124 | 200 | 10.36 s (full) |
+| false again | 41 | 2,103 | 200 | 3.13 s (delta) |
+
+The former 7,528-task total was incomplete: only 41 active projects were loaded,
+discarding tasks in 28 closed projects. The corrected ALL response includes
+69 projects and matches the unrestricted Redmine issues `total_count` of 10,940.
+The compact ALL payload is 3,133,762 bytes; the two-month payload is 605,299 bytes.
+Web project badges now count nested subtasks and subprojects, and Explorer shows
+the total task/project count for the currently displayed tree. Previously badges
+counted only root tasks, which also understated the apparent number of tasks.
 
 These latest measurements use the fixed server locally against the actual
 Redmine. Before the fix, direct production API scope tests also returned HTTP
@@ -141,14 +174,15 @@ between loads and verifies it appears after delta reload while the two-month
 filter is enabled. Disabling the filter restores the older parent and nesting;
 re-enabling returns only recent tasks. Tests also check month-end/leap-year
 cutoffs, snapshot provenance, cancellation while queued, scope isolation and no
-assignee restriction in all-task mode. All 24
+assignee restriction in all-task mode. All 27
 tests pass. No real Redmine task was created or
 modified for testing. Other tests cover failure/retry, deletion/count mismatch,
 project access changes, expiry, clock fallback, overlapping reloads, snapshot
 compression and listener cleanup with actual Axios HTTP requests.
 
 An additional real React DOM smoke test loads the actual web component and API
-service in jsdom. It verifies default recent mode, disabling the filter, a 504,
+service in jsdom. It verifies inactive defaults to false, independent inactive/date
+toggles, Sync preserving both scopes, nested task/project totals, default recent mode, disabling the filter, a 504,
 remount, Sync all, rapid toggles and an out-of-order recent response. To run it
 without adding dependencies to either repository:
 

@@ -10,6 +10,7 @@ export type TreeFilters = {
   taskDate: string;
   compact: boolean;
   createdSince?: string;
+  includeInactiveProjects?: boolean;
 };
 
 export function twoMonthsAgo(now = new Date()): string {
@@ -30,55 +31,38 @@ export function createTreeAbortController(concurrency: number) {
   return controller;
 }
 
-export function treeIssueParams(filters: TreeFilters, projects: RecordData[], updatedSince?: string) {
+export function treeIssueParams(filters: TreeFilters, projects: RecordData[], updatedSince?: string): RecordData {
+  // Include-inactive mode keeps all visible issues. Only the explicit active
+  // scope restricts project IDs; date and assignee filters remain independent.
   const params: RecordData = {
     status_id: '*', sort: 'id:desc',
     ...(filters.onlyShowMyTasks ? { assigned_to_id: 'me' } : {}),
-    ...(filters.taskDate ? { created_on: filters.taskDate } : {}),
+    ...(filters.taskDate ? { created_on: filters.taskDate }
+      : filters.createdSince ? { created_on: `>=${filters.createdSince}` } : {}),
+    // This Redmine accepts dates, not timestamps. The sync layer overlaps a day.
+    ...(filters.createdSince && updatedSince ? { updated_on: `>=${updatedSince.slice(0, 10)}` } : {}),
   };
-  // Native query filters support multiple project IDs; project_id="1,2" does
-  // not. Bound URL length, and retain existing assignee/date filter semantics.
-  if (!filters.onlyShowMyTasks && !filters.taskDate && projects.length && projects.length <= 100) {
+  if (filters.includeInactiveProjects === false && !filters.taskDate) {
     Object.assign(params, {
       set_filter: 1,
       'f[]': ['status_id', 'project_id'],
       'op[status_id]': '*',
       'op[project_id]': '=',
-      'v[project_id][]': projects.map(project => project.id),
+      'v[project_id][]': projects.filter(project => project.status === undefined || project.status === 1).map(project => project.id),
     });
-  }
-  if (filters.createdSince && !filters.taskDate) {
-    if (params['f[]']) {
-      params['f[]'].push('created_on');
-      params['op[created_on]'] = '>=';
-      params['v[created_on][]'] = [filters.createdSince];
-    } else params.created_on = `>=${filters.createdSince}`;
-  }
-  if (updatedSince) {
-    // This installation rejects timestamp values with HTTP 422. Date filters
-    // are supported; the sync layer overlaps a full day for timezone safety.
-    const updatedDate = updatedSince.slice(0, 10);
-    if (params['f[]']) {
-      params['f[]'].push('updated_on');
-      params['op[updated_on]'] = '>=';
-      params['v[updated_on][]'] = [updatedDate];
-    } else {
-      params.updated_on = `>=${updatedDate}`;
+    for (const field of ['assigned_to_id', 'created_on', 'updated_on']) {
+      if (params[field] === undefined) continue;
+      params['f[]'].push(field);
+      params[`op[${field}]`] = field === 'assigned_to_id' ? '=' : '>=';
+      params[`v[${field}][]`] = [field === 'assigned_to_id' ? params[field] : params[field].slice(2)];
+      delete params[field];
     }
   }
   return params;
 }
 
 export function treeIssueCountParams(filters: TreeFilters, projects: RecordData[]) {
-  const params = treeIssueParams({ ...filters, onlyShowMyTasks: false }, projects);
-  if (filters.onlyShowMyTasks) {
-    if (params['f[]']) {
-      params['f[]'].push('assigned_to_id');
-      params['op[assigned_to_id]'] = '=';
-      params['v[assigned_to_id][]'] = ['me'];
-    } else params.assigned_to_id = 'me';
-  }
-  return params;
+  return treeIssueParams(filters, projects);
 }
 
 // Share one request budget between the projects and issues collections.
@@ -145,17 +129,26 @@ export async function fetchCollection(
 }
 
 export function buildProjectTaskTree(projects: RecordData[], issues: RecordData[], filters: TreeFilters) {
+  const allProjects = projects.filter(project => filters.includeInactiveProjects !== false || project.status === undefined || project.status === 1);
   const projectNodes = new Map<number, RecordData>();
   const taskNodes = new Map<number, RecordData>();
   const roots: RecordData[] = [];
-  for (const project of projects) {
+  for (const project of allProjects) {
     projectNodes.set(project.id, {
       id: project.id, name: project.name, identifier: project.identifier, tasks: [], subProjects: [],
     });
   }
   const search = filters.taskName.toLowerCase();
   for (const task of issues) {
-    if (!projectNodes.has(task.project?.id)) continue;
+    if (!task.project?.id) throw new Error('Redmine issue has no project reference');
+    if (!projectNodes.has(task.project.id)) {
+      if (filters.includeInactiveProjects === false) continue;
+      // Retain a visible issue even when the project-list endpoint omits its
+      // project. Use only metadata supplied by Redmine, not invented hierarchy.
+      const project = task.project;
+      allProjects.push(project);
+      projectNodes.set(project.id, { id: project.id, name: project.name, identifier: project.identifier, tasks: [], subProjects: [] });
+    }
     if (search && !task.subject.toLowerCase().includes(search) && !String(task.id).includes(search)) continue;
     const data = filters.compact ? {
       id: task.id, subject: task.subject, project: task.project, parent: task.parent,
@@ -170,7 +163,7 @@ export function buildProjectTaskTree(projects: RecordData[], issues: RecordData[
     if (parent && parent.project.id === task.project.id && parent.id !== task.id) parent.subtasks.push(task);
     else projectNodes.get(task.project.id)!.tasks.push(task);
   }
-  for (const project of projects) {
+  for (const project of allProjects) {
     const node = projectNodes.get(project.id)!;
     const parent = projectNodes.get(project.parent?.id);
     if (parent && parent.id !== project.id) parent.subProjects.push(node);

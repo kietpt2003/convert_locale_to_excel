@@ -49,13 +49,24 @@ const container = document.getElementById('root');
 let root = createRoot(container);
 const recentCheckbox = () => [...container.querySelectorAll('label')].find(label => label.textContent.includes('Last 2 Months')).querySelector('input');
 const syncButton = () => [...container.querySelectorAll('button')].find(button => button.textContent.includes('Sync Now'));
+const inactiveCheckbox = () => [...container.querySelectorAll('label')].find(label => label.textContent.includes('Include Inactive Projects')).querySelector('input');
 async function complete(index, name) {
-  await React.act(async () => pending[index].resolve({ data: [{ id: 1, name, tasks: [], subProjects: [] }], status: 200 }));
+  const task = id => ({ id, subject: `Task ${id}`, status: { id: 1, name: 'Open' }, tracker: { id: 1, name: 'Task' } });
+  await React.act(async () => pending[index].resolve({ data: [{ id: 1, name,
+    tasks: [{ ...task(1), subtasks: [task(2)] }],
+    subProjects: [{ id: 2, name: 'Nested project', tasks: [task(3)], subProjects: [] }],
+  }], status: 200 }));
+  if (!pending[index].signal.aborted) {
+    assert.ok(container.textContent.includes('3 tasks · 2 projects'));
+    assert.ok(container.textContent.includes('3 Tasks'));
+  }
 }
 (async () => {
   try {
     await React.act(async () => root.render(React.createElement(Explorer)));
     assert.equal(pending[0].params.recentOnly, true);
+    assert.equal(pending[0].params.includeInactiveProjects, false);
+    assert.equal(inactiveCheckbox().checked, false);
     await complete(0, 'RECENT_ONLY');
     await React.act(async () => recentCheckbox().click());
     assert.equal(pending[1].params.recentOnly, false);
@@ -90,6 +101,22 @@ async function complete(index, name) {
     assert.equal(pending[6].params.fullReload, true);
     await complete(6, 'FULL_AFTER_SYNC');
     assert.equal(recentCheckbox().checked, false);
+    await React.act(async () => inactiveCheckbox().click());
+    assert.equal(pending[7].params.includeInactiveProjects, true);
+    assert.equal(pending[7].params.recentOnly, false);
+    await complete(7, 'INCLUDING_CLOSED_PROJECTS');
+    await React.act(async () => syncButton().click());
+    assert.equal(pending[8].params.includeInactiveProjects, true);
+    assert.equal(pending[8].params.fullReload, true);
+    await complete(8, 'INCLUDING_CLOSED_AFTER_SYNC');
+    await React.act(async () => recentCheckbox().click());
+    assert.equal(pending[9].params.recentOnly, true);
+    assert.equal(pending[9].params.includeInactiveProjects, true);
+    await complete(9, 'RECENT_WITH_CLOSED');
+    await React.act(async () => inactiveCheckbox().click());
+    assert.equal(pending[10].params.includeInactiveProjects, false);
+    assert.equal(pending[10].params.recentOnly, true);
+    await complete(10, 'RECENT_ACTIVE_ONLY');
     assert.equal(errors.length, 1);
     console.log('PASS: real React DOM + actual API service: default recent, disable, 504, remount, Sync all, rapid toggles, stale response rejected.');
   } finally {

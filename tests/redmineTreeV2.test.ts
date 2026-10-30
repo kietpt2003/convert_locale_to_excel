@@ -6,19 +6,13 @@ import { buildProjectTaskTree, createRequestPool, fetchCollection, loadTreeOnce,
 const filters: TreeFilters = { onlyShowMyTasks: false, projectName: '', taskName: '', taskDate: '', compact: false };
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-test('full scan limits upstream tasks to visible projects without overriding assignee or date filters', () => {
-  const params = treeIssueParams(filters, [{ id: 1 }, { id: 2 }]);
-  assert.deepEqual(params['v[project_id][]'], [1, 2]);
-  assert.equal(params['op[status_id]'], '*');
-  assert.equal(params['op[project_id]'], '=');
+test('all-time queries have no date or project restriction, including closed/unlisted issue projects', () => {
+  const params = treeIssueParams(filters, [{ id: 1 }, { id: 2 }], '2026-10-30');
+  assert.deepEqual(params, { status_id: '*', sort: 'id:desc' });
   const mine = treeIssueParams({ ...filters, onlyShowMyTasks: true }, [{ id: 1 }]);
   assert.equal(mine.assigned_to_id, 'me');
-  assert.equal(mine['f[]'], undefined);
   const dated = treeIssueParams({ ...filters, taskDate: '2026-10-30' }, [{ id: 1 }]);
   assert.equal(dated.created_on, '2026-10-30');
-  assert.equal(dated['f[]'], undefined);
-  const many = treeIssueParams(filters, Array.from({ length: 101 }, (_, id) => ({ id })));
-  assert.equal(many['f[]'], undefined);
 });
 
 test('pagination reuses first page, respects upstream limit and keeps pool busy', async () => {
@@ -135,4 +129,21 @@ test('large tree benchmark preserves all 30000 tasks', () => {
   assert.equal(tree[0].tasks.length, 3000);
   assert.equal(tree[0].tasks.reduce((sum: number, task: any) => sum + 1 + task.subtasks.length, 0), 30000);
   console.log(`30000-task tree: ${duration.toFixed(1)}ms; compact bytes: ${JSON.stringify(tree).length}; raw bytes: ${JSON.stringify(tasks).length}`);
+});
+
+test('closed project tasks and visible issues whose project is omitted from the list are retained', () => {
+  const projects = [{ id: 1, name: 'Active', status: 1 }, { id: 2, name: 'Closed', status: 5 }];
+  const issues = [
+    { id: 10, subject: 'Active task', project: { id: 1, name: 'Active' } },
+    { id: 11, subject: 'Closed task', project: { id: 2, name: 'Closed' }, created_on: '2010-01-01' },
+    { id: 12, subject: 'Visible orphan project task', project: { id: 3, name: 'Unlisted visible project' } },
+  ];
+  const tree = buildProjectTaskTree(projects, issues, filters);
+  assert.equal(tree.length, 3);
+  assert.deepEqual(tree.flatMap(project => project.tasks.map((task: any) => task.id)), [10, 11, 12]);
+  assert.equal(tree[2].name, 'Unlisted visible project');
+  assert.equal(projects.length, 2);
+  const activeTree = buildProjectTaskTree(projects, issues, { ...filters, includeInactiveProjects: false });
+  assert.equal(activeTree.length, 1);
+  assert.deepEqual(activeTree[0].tasks.map((task: any) => task.id), [10]);
 });

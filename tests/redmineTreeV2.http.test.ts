@@ -72,8 +72,8 @@ test('recent HTTP reload includes a new unassigned task; toggling off restores o
       response.end(JSON.stringify({ projects: [{ id: 1, name: 'Visible project' }], total_count: 1, limit }));
       return;
     }
-    const since = url.searchParams.get('v[updated_on][]');
-    const createdSince = url.searchParams.get('v[created_on][]');
+    const since = url.searchParams.get('updated_on')?.replace(/^>=/, '') || null;
+    const createdSince = url.searchParams.get('created_on')?.replace(/^>=/, '') || null;
     requests.push({ since, assignee: url.searchParams.get('assigned_to_id') });
     const issues = items.filter(item => (!since || item.updated_on >= since) && (!createdSince || item.created_on >= createdSince)).sort((a, b) => b.id - a.id);
     response.end(JSON.stringify({ issues: issues.slice(0, limit), total_count: issues.length, limit }));

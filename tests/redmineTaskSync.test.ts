@@ -7,7 +7,7 @@ import { buildProjectTaskTree, treeIssueCountParams, treeIssueParams, twoMonthsA
 const now = Date.parse('2026-10-30T10:00:00Z');
 const projects = [{ id: 1, name: 'Project' }];
 const oldTask = { id: 1, subject: 'Existing', project: { id: 1 }, updated_on: '2026-10-30T09:59:00Z' };
-const baseline = (): TaskSnapshot => ({ version: 2, projects, tasks: [oldTask], syncedAt: new Date(now - 1000).toISOString(), reconciledAt: now - 1000 });
+const baseline = (): TaskSnapshot => ({ version: 3, projects, tasks: [oldTask], syncedAt: new Date(now - 1000).toISOString(), reconciledAt: now - 1000 });
 const filters: TreeFilters = { onlyShowMyTasks: false, taskDate: '', taskName: '', projectName: '', compact: true };
 const source = (tasks: any[], count = 1): SyncSource => ({
   projects: async () => ({ items: projects, serverDate: new Date(now).toUTCString() }),
@@ -25,8 +25,8 @@ test('two-month cutoff uses calendar months and clamps shorter months without ro
 test('recent filter reaches full, delta and count queries without adding an assignee restriction', () => {
   const recent = { ...filters, createdSince: '2026-08-31' };
   for (const params of [treeIssueParams(recent, projects), treeIssueParams(recent, projects, '2026-10-29'), treeIssueCountParams(recent, projects)]) {
-    assert.equal(params['op[created_on]'], '>=');
-    assert.deepEqual(params['v[created_on][]'], ['2026-08-31']);
+    assert.equal(params.created_on, '>=2026-08-31');
+    assert.equal('project_id' in params, false);
     assert.equal(params.assigned_to_id, undefined);
   }
   const mine = treeIssueParams({ ...recent, onlyShowMyTasks: true }, projects, '2026-10-29');
@@ -34,8 +34,8 @@ test('recent filter reaches full, delta and count queries without adding an assi
   assert.equal(mine.updated_on, '>=2026-10-29');
   assert.equal(mine.assigned_to_id, 'me');
   const count = treeIssueCountParams({ ...recent, onlyShowMyTasks: true }, projects);
-  assert.deepEqual(count['v[created_on][]'], ['2026-08-31']);
-  assert.deepEqual(count['v[assigned_to_id][]'], ['me']);
+  assert.equal(count.created_on, '>=2026-08-31');
+  assert.equal(count.assigned_to_id, 'me');
   assert.equal(treeIssueParams(filters, projects).created_on, undefined);
   assert.equal(treeIssueParams({ ...recent, taskDate: '<=2026-09-01' }, projects).created_on, '<=2026-09-01');
 });
@@ -65,17 +65,16 @@ test('reload includes another author’s new unassigned task and updates existin
   assert.equal(tree[0].tasks[0].id, 2);
   const params = treeIssueParams(filters, projects, observedSince);
   assert.equal(params.assigned_to_id, undefined);
-  assert.deepEqual(params['f[]'], ['status_id', 'project_id', 'updated_on']);
-  assert.equal(params['op[updated_on]'], '>=');
+  assert.equal(params.updated_on, undefined);
 });
 
 test('Only My Tasks keeps its own scope and timestamp filter', () => {
   const params = treeIssueParams({ ...filters, onlyShowMyTasks: true }, projects, '2026-10-30T10:00:00Z');
   assert.equal(params.assigned_to_id, 'me');
-  assert.equal(params.updated_on, '>=2026-10-30');
+  assert.equal(params.updated_on, undefined);
   const countParams = treeIssueCountParams({ ...filters, onlyShowMyTasks: true }, projects);
-  assert.deepEqual(countParams['v[project_id][]'], [1]);
-  assert.deepEqual(countParams['v[assigned_to_id][]'], ['me']);
+  assert.equal(countParams.project_id, undefined);
+  assert.equal(countParams.assigned_to_id, 'me');
   assert.notEqual(snapshotKey('host', 'secret', false), snapshotKey('host', 'secret', true));
   assert.notEqual(snapshotKey('other', 'secret', false), snapshotKey('host', 'secret', false));
   assert.notEqual(snapshotKey('host', 'other', false), snapshotKey('host', 'secret', false));
@@ -122,7 +121,7 @@ test('full reconciliation expires after the original five-minute visibility wind
 test('an empty project list removes prior tasks; missing server Date never advances using local clock', async () => {
   const upstream = source([]);
   upstream.projects = async () => ({ items: [] });
-  upstream.tasks = async () => { throw new Error('should not fetch tasks'); };
+  upstream.tasks = async () => [];
   assert.deepEqual((await synchronizeTasks(baseline(), upstream, false, now)).snapshot.tasks, []);
   upstream.projects = async () => ({ items: projects });
   upstream.tasks = async () => [];
@@ -174,6 +173,7 @@ test('snapshot provenance rejects recent data under an all-dates key and invalid
   const all = { ...baseline(), scope: allKey };
   assert.deepEqual(await decodeSnapshot(await encodeSnapshot(all, now), allKey), all);
   assert.equal(await decodeSnapshot(await encodeSnapshot({ ...all, version: 1 } as any, now), allKey), undefined);
+  assert.equal(await decodeSnapshot(await encodeSnapshot({ ...all, version: 2 } as any, now), allKey), undefined);
 });
 
 test('a request cancelled while queued rejects immediately and never starts an abandoned scan', async () => {
@@ -191,4 +191,40 @@ test('a request cancelled while queued rejects immediately and never starts an a
   await first;
   assert.equal(await serializeTaskSync('cancel-queue', async () => 42), 42);
   assert.equal(ran, false);
+});
+
+test('full and delta sync do not drop visible tasks when project-list metadata is incomplete', async () => {
+  const missing = { id: 20, subject: 'Visible issue', project: { id: 2, name: 'Closed/unlisted project' } };
+  const full = await synchronizeTasks(undefined, source([oldTask, missing], 2), false, now);
+  assert.equal(full.snapshot.tasks.length, 2);
+  const delta = await synchronizeTasks(full.snapshot, source([{ ...missing, subject: 'Updated visible issue' }], 2), false, now + 1000);
+  assert.equal(delta.mode, 'DELTA');
+  assert.equal(delta.snapshot.tasks.length, 2);
+  assert.equal(delta.snapshot.tasks[0].subject, 'Updated visible issue');
+  const noProjects = source([missing], 1);
+  noProjects.projects = async () => ({ items: [] });
+  assert.equal((await synchronizeTasks(undefined, noProjects, false, now)).snapshot.tasks.length, 1);
+});
+
+test('active-only queries combine independently with date and assignee filters and counts', () => {
+  const list = [{ id: 1, status: 1 }, { id: 2, status: 5 }, { id: 3, status: 9 }];
+  const active = { ...filters, includeInactiveProjects: false };
+  const allDates = treeIssueParams(active, list);
+  assert.deepEqual(allDates['v[project_id][]'], [1]);
+  assert.equal(allDates['op[status_id]'], '*');
+  assert.equal(allDates['f[]'].includes('created_on'), false);
+  assert.equal(allDates['f[]'].includes('updated_on'), false);
+  const recent = { ...active, createdSince: '2026-08-31', onlyShowMyTasks: true };
+  const delta = treeIssueParams(recent, list, '2026-10-29');
+  assert.deepEqual(delta['v[project_id][]'], [1]);
+  assert.deepEqual(delta['v[created_on][]'], ['2026-08-31']);
+  assert.deepEqual(delta['v[updated_on][]'], ['2026-10-29']);
+  assert.deepEqual(delta['v[assigned_to_id][]'], ['me']);
+  const count = treeIssueCountParams(recent, list);
+  assert.deepEqual(count['v[project_id][]'], [1]);
+  assert.equal(count['f[]'].includes('updated_on'), false);
+  const including = treeIssueParams({ ...active, includeInactiveProjects: true }, list);
+  assert.equal(including['f[]'], undefined);
+  assert.equal(including.created_on, undefined);
+  assert.notEqual(snapshotKey('host', 'key', false, undefined, false), snapshotKey('host', 'key', false, undefined, true));
 });

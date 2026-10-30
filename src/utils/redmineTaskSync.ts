@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 
 type Data = Record<string, any>;
 export type TaskSnapshot = {
-  version: 2;
+  version: 3;
   scope?: string;
   projects: Data[];
   tasks: Data[];
@@ -24,10 +24,11 @@ export const FULL_RECONCILE_MS = 5 * 60_000;
 // previous day too so UTC/local-date boundaries cannot skip new issues.
 const OVERLAP_MS = 24 * 60 * 60_000 + 2 * 60_000;
 
-export function snapshotKey(url: string, apiKey: string, mine: boolean, createdSince?: string) {
+export function snapshotKey(url: string, apiKey: string, mine: boolean, createdSince?: string, includeInactiveProjects = true) {
   const scope: Array<string | boolean> = [url, apiKey, mine];
   if (createdSince) scope.push(createdSince);
-  return `redmine:snapshot:v2:${createHash('sha256').update(JSON.stringify(scope)).digest('hex')}`;
+  if (!includeInactiveProjects) scope.push('active-projects-only');
+  return `redmine:snapshot:v3:${createHash('sha256').update(JSON.stringify(scope)).digest('hex')}`;
 }
 
 export async function encodeSnapshot(snapshot: TaskSnapshot, generation: number) {
@@ -40,7 +41,7 @@ export async function decodeSnapshot(value: string | null | undefined, expectedS
   try {
     const { payload } = JSON.parse(value);
     const snapshot = JSON.parse((await decompress(Buffer.from(payload, 'base64'), { maxOutputLength: 64 * 1024 * 1024 })).toString());
-    if (snapshot.version !== 2 || (expectedScope && snapshot.scope !== expectedScope)
+    if (snapshot.version !== 3 || (expectedScope && snapshot.scope !== expectedScope)
       || !Array.isArray(snapshot.projects) || !Array.isArray(snapshot.tasks)
       || !Number.isFinite(Date.parse(snapshot.syncedAt)) || !Number.isFinite(snapshot.reconciledAt)) return;
     return snapshot;
@@ -83,25 +84,25 @@ export async function synchronizeTasks(
     ? new Date(serverDate).toISOString() : previous?.syncedAt || new Date(0).toISOString();
   let tasks: Data[];
   if (full) {
-    tasks = projects.length ? await source.tasks(projects) : [];
+    tasks = await source.tasks(projects);
   } else {
     const since = new Date(Math.max(0, Date.parse(previous!.syncedAt) - OVERLAP_MS)).toISOString().slice(0, 10);
-    const changes = projects.length ? await source.tasks(projects, since) : [];
+    const changes = await source.tasks(projects, since);
     const merged = new Map(previous!.tasks.map(task => [task.id, task]));
     for (const task of changes) merged.set(task.id, task);
-    tasks = [...merged.values()].filter(task => projectIds.has(task.project?.id));
+    tasks = [...merged.values()];
     // Deleted/moved/inaccessible tasks and assignee changes may not appear in
     // the delta. A fresh total detects mismatches and forces reconciliation.
-    const expected = projects.length ? await source.count(projects) : 0;
+    const expected = await source.count(projects);
     if (tasks.length !== expected) {
-      tasks = projects.length ? await source.tasks(projects) : [];
+      tasks = await source.tasks(projects);
       full = true;
     }
   }
-  tasks = tasks.filter(task => projectIds.has(task.project?.id)).sort((a, b) => b.id - a.id);
+  tasks = [...tasks].sort((a, b) => b.id - a.id);
   return {
     mode: full ? 'FULL' : 'DELTA',
-    snapshot: { version: 2, projects, tasks, syncedAt, reconciledAt: full ? now : previous!.reconciledAt },
+    snapshot: { version: 3, projects, tasks, syncedAt, reconciledAt: full ? now : previous!.reconciledAt },
   };
 }
 

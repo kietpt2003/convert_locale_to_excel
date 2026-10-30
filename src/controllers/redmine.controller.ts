@@ -597,11 +597,12 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
       taskDate: String(req.query.taskDate || ''),
       compact: req.query.compact === 'true',
       createdSince: req.query.recentOnly === 'true' && !req.query.taskDate ? twoMonthsAgo() : undefined,
+      includeInactiveProjects: req.query.includeInactiveProjects === 'true',
     };
     const url = normalizeUrl(account.redmineUrl);
-    const key = snapshotKey(url, account.redmineApiKey, filters.onlyShowMyTasks, filters.createdSince);
+    const key = snapshotKey(url, account.redmineApiKey, filters.onlyShowMyTasks, filters.createdSince, filters.includeInactiveProjects);
     res.set('Cache-Control', 'private, no-store');
-    res.set('X-Redmine-Scope', `${filters.onlyShowMyTasks ? 'mine' : 'all'}:${filters.createdSince || 'all-dates'}`);
+    res.set('X-Redmine-Scope', `${filters.onlyShowMyTasks ? 'mine' : 'all'}:${filters.createdSince || 'all-dates'}:${filters.includeInactiveProjects ? 'all-projects' : 'active-projects'}`);
     // Cache outages must not prevent access to Redmine. Bound cache latency too.
     const cacheOperation = async <T,>(operation: () => Promise<T>): Promise<T | undefined> => {
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -623,27 +624,35 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
       // were faster with one request. Higher-capacity hosts can opt in via env.
       const pool = createRequestPool(concurrency);
       let serverDate: string | undefined;
-      const getProjects = async () => ({
-        items: await fetchCollection(`${url}/projects.json`, account.redmineApiKey,
-          { status: REDMINE_PROJECT_STATUS.ACTIVE }, 'projects', pool, concurrency, abort.signal,
-          date => { serverDate = date; }),
-        serverDate,
-      });
+      const getProjects = async () => {
+        // This installation defaults to active projects; status='*' is not
+        // supported. Closed/archived metadata is fetched only when requested;
+        // otherwise issue queries are explicitly restricted to active IDs.
+        const groups = await Promise.all((filters.includeInactiveProjects ? [1, 5, 9] : [1]).map(status =>
+          fetchCollection(`${url}/projects.json`, account.redmineApiKey,
+            { status }, 'projects', pool, concurrency, abort.signal,
+            date => { if (!serverDate) serverDate = date; }).catch(error => {
+              if (status !== 1 && axios.isAxiosError(error) && [403, 404].includes(error.response?.status || 0)) return [];
+              throw error;
+            })));
+        return { items: [...new Map(groups.flat().map(project => [project.id, project])).values()], serverDate };
+      };
       // Preserve arbitrary created_on operators by sending dated searches
       // directly to Redmine rather than approximating them in local storage.
       if (filters.taskDate) {
         const { items: projects } = await getProjects();
-        const tasks = projects.length ? await fetchCollection(`${url}/issues.json`, account.redmineApiKey,
-          treeIssueParams(filters, projects), 'issues', pool, concurrency, abort.signal) : [];
+        const tasks = await fetchCollection(`${url}/issues.json`, account.redmineApiKey,
+          treeIssueParams(filters, projects), 'issues', pool, concurrency, abort.signal);
         return buildProjectTaskTree(projects, tasks, filters);
       }
       const previous = await decodeSnapshot(await cacheOperation(async () => (await getRedisClient()).get(key)), key);
       const baseFilters = { ...filters, taskName: '', projectName: '', compact: false };
       const { snapshot, mode } = await synchronizeTasks(previous, {
         projects: getProjects,
-        tasks: (projects, since) => fetchCollection(`${url}/issues.json`, account.redmineApiKey,
-          treeIssueParams(baseFilters, projects, since), 'issues', pool, concurrency, abort.signal),
-        count: projects => pool(async () => {
+        tasks: (projects, since) => !filters.includeInactiveProjects && !projects.length ? Promise.resolve([])
+          : fetchCollection(`${url}/issues.json`, account.redmineApiKey,
+            treeIssueParams(baseFilters, projects, since), 'issues', pool, concurrency, abort.signal),
+        count: projects => !filters.includeInactiveProjects && !projects.length ? Promise.resolve(0) : pool(async () => {
           const { data } = await axios.get(`${url}/issues.json`, {
             headers: { 'X-Redmine-API-Key': account.redmineApiKey },
             params: { ...treeIssueCountParams(baseFilters, projects), limit: 1, offset: 0 },
@@ -652,7 +661,7 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
           if (!Number.isInteger(data.total_count) || data.total_count < 0) throw new Error('Invalid Redmine issue count');
           return data.total_count;
         }),
-      }, req.query.fullReload === 'true' || (req.query.reload === 'true' && !filters.createdSince));
+      }, req.query.fullReload === 'true' || !filters.createdSince);
       // Save only after projects, every delta page and validation succeed.
       const encoded = await encodeSnapshot({ ...snapshot, scope: key }, generation);
       await cacheOperation(async () => (await getRedisClient()).eval(SAVE_SNAPSHOT_SCRIPT, {
