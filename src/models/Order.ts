@@ -8,6 +8,15 @@ export interface IOrder extends Document {
   userName: string;
   userEmail: string;
   amount: number;
+  currency: string;
+  paymentVerifiedAt?: Date;
+  verifiedCaptureId?: string;
+  buyOneGetOne: boolean;
+  recipientUserId?: mongoose.Types.ObjectId;
+  recipientEmail?: string;
+  giftActivatedAt?: Date;
+  giftValidUntil?: Date | null;
+  giftActivationSource?: 'checkout' | 'legacy-reconcile';
   planType: PREMIUM_PLAN_ENUM;
   orderId: string;
   paypalCaptureId: string;
@@ -40,6 +49,15 @@ const orderSchema = new Schema<IOrder>(
       type: Number,
       required: true,
     },
+    paymentVerifiedAt: { type: Date },
+    verifiedCaptureId: { type: String },
+    currency: { type: String, enum: ['USD', 'VND'] },
+    buyOneGetOne: { type: Boolean, default: false },
+    recipientUserId: { type: Schema.Types.ObjectId, ref: 'AuthorizedUser', required: function(this: IOrder) { return this.buyOneGetOne; } },
+    giftActivatedAt: { type: Date },
+    giftValidUntil: { type: Date },
+    giftActivationSource: { type: String, enum: ['checkout', 'legacy-reconcile'] },
+    recipientEmail: { type: String, trim: true, lowercase: true },
     planType: {
       type: String,
       enum: Object.values(PREMIUM_PLAN_ENUM),
