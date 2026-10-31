@@ -24,8 +24,9 @@ export const FULL_RECONCILE_MS = 5 * 60_000;
 // previous day too so UTC/local-date boundaries cannot skip new issues.
 const OVERLAP_MS = 24 * 60 * 60_000 + 2 * 60_000;
 
-export function snapshotKey(url: string, apiKey: string, mine: boolean, createdSince?: string, includeInactiveProjects = true) {
+export function snapshotKey(url: string, apiKey: string, mine: boolean, createdSince?: string, includeInactiveProjects = true, projectIds?: number[]) {
   const scope: Array<string | boolean> = [url, apiKey, mine];
+  if (projectIds !== undefined) scope.push(`project-subtrees:v1:${[...new Set(projectIds)].sort((a, b) => a - b).join(',')}`);
   if (createdSince) scope.push(createdSince);
   if (!includeInactiveProjects) scope.push('active-projects-only');
   return `redmine:snapshot:v3:${createHash('sha256').update(JSON.stringify(scope)).digest('hex')}`;

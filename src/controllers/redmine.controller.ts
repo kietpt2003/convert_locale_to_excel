@@ -11,6 +11,7 @@ import { fetchRedmineDataParallel, getTotalLoggedHours, normalizeUrl } from '../
 import { RedmineAccount } from '../models/RedmineAccount.js';
 import { getRedisClient } from '../index.js';
 import { buildProjectTaskTree, createRequestPool, createTreeAbortController, fetchCollection, treeIssueCountParams, treeIssueParams, twoMonthsAgo, type TreeFilters } from '../utils/redmineTreeV2.js';
+import { expandProjectIds, InvalidProjectIds, parseProjectIds } from '../utils/projectIds.js';
 import { decodeSnapshot, encodeSnapshot, SAVE_SNAPSHOT_SCRIPT, serializeTaskSync, snapshotKey, synchronizeTasks } from '../utils/redmineTaskSync.js';
 
 dotenv.config();
@@ -586,11 +587,14 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
   const onDisconnect = () => { if (!res.writableEnded) abort.abort(); };
   res.once('close', onDisconnect);
   try {
+    const projectIds = parseProjectIds(req.query.projectIds, true);
+    if (projectIds?.length === 0) return res.json([]);
     const account = await getRedmineAccount(req.user.email);
     if (!account?.redmineApiKey || !account.redmineUrl) {
       return res.status(400).json({ message: 'Missing Redmine Configuration' });
     }
     const filters: TreeFilters = {
+      projectIds,
       onlyShowMyTasks: req.query.onlyShowMyTasks === 'true',
       projectName: String(req.query.projectName || ''),
       taskName: String(req.query.taskName || ''),
@@ -600,7 +604,7 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
       includeInactiveProjects: req.query.includeInactiveProjects === 'true',
     };
     const url = normalizeUrl(account.redmineUrl);
-    const key = snapshotKey(url, account.redmineApiKey, filters.onlyShowMyTasks, filters.createdSince, filters.includeInactiveProjects);
+    const key = snapshotKey(url, account.redmineApiKey, filters.onlyShowMyTasks, filters.createdSince, filters.includeInactiveProjects, filters.projectIds);
     res.set('Cache-Control', 'private, no-store');
     res.set('X-Redmine-Scope', `${filters.onlyShowMyTasks ? 'mine' : 'all'}:${filters.createdSince || 'all-dates'}:${filters.includeInactiveProjects ? 'all-projects' : 'active-projects'}`);
     // Cache outages must not prevent access to Redmine. Bound cache latency too.
@@ -626,22 +630,27 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
       let serverDate: string | undefined;
       const getProjects = async () => {
         // This installation defaults to active projects; status='*' is not
-        // supported. Closed/archived metadata is fetched only when requested;
-        // otherwise issue queries are explicitly restricted to active IDs.
-        const groups = await Promise.all((filters.includeInactiveProjects ? [1, 5, 9] : [1]).map(status =>
+        // supported. Explicit selections also need inactive metadata to traverse
+        // the complete hierarchy; the issue query still honors active-only mode.
+        const groups = await Promise.all((filters.includeInactiveProjects || projectIds ? [1, 5, 9] : [1]).map(status =>
           fetchCollection(`${url}/projects.json`, account.redmineApiKey,
             { status }, 'projects', pool, concurrency, abort.signal,
             date => { if (!serverDate) serverDate = date; }).catch(error => {
               if (status !== 1 && axios.isAxiosError(error) && [403, 404].includes(error.response?.status || 0)) return [];
               throw error;
             })));
-        return { items: [...new Map(groups.flat().map(project => [project.id, project])).values()], serverDate };
+        const allProjects = [...new Map(groups.flat().map(project => [project.id, project])).values()];
+        const selected = projectIds ? new Set(expandProjectIds(projectIds, allProjects as Array<{ id: number }>)) : undefined;
+        const items = allProjects.filter(project => !selected || selected.has(project.id));
+        return { items, serverDate };
       };
+      const hasTaskProjects = (projects: any[]) => filters.includeInactiveProjects
+        || projects.some(project => project.status === undefined || project.status === 1);
       // Preserve arbitrary created_on operators by sending dated searches
       // directly to Redmine rather than approximating them in local storage.
       if (filters.taskDate) {
         const { items: projects } = await getProjects();
-        const tasks = await fetchCollection(`${url}/issues.json`, account.redmineApiKey,
+        const tasks = !hasTaskProjects(projects) ? [] : await fetchCollection(`${url}/issues.json`, account.redmineApiKey,
           treeIssueParams(filters, projects), 'issues', pool, concurrency, abort.signal);
         return buildProjectTaskTree(projects, tasks, filters);
       }
@@ -649,10 +658,10 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
       const baseFilters = { ...filters, taskName: '', projectName: '', compact: false };
       const { snapshot, mode } = await synchronizeTasks(previous, {
         projects: getProjects,
-        tasks: (projects, since) => !filters.includeInactiveProjects && !projects.length ? Promise.resolve([])
+        tasks: (projects, since) => !hasTaskProjects(projects) ? Promise.resolve([])
           : fetchCollection(`${url}/issues.json`, account.redmineApiKey,
             treeIssueParams(baseFilters, projects, since), 'issues', pool, concurrency, abort.signal),
-        count: projects => !filters.includeInactiveProjects && !projects.length ? Promise.resolve(0) : pool(async () => {
+        count: projects => !hasTaskProjects(projects) ? Promise.resolve(0) : pool(async () => {
           const { data } = await axios.get(`${url}/issues.json`, {
             headers: { 'X-Redmine-API-Key': account.redmineApiKey },
             params: { ...treeIssueCountParams(baseFilters, projects), limit: 1, offset: 0 },
@@ -676,6 +685,7 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
     return res.json(tree);
   } catch (error: any) {
     if (res.destroyed) return;
+    if (error instanceof InvalidProjectIds) return res.status(400).json({ message: error.message });
     const status = axios.isAxiosError(error) ? error.response?.status : undefined;
     const timedOut = abort.signal.aborted || (axios.isAxiosError(error) && (error.code === 'ERR_CANCELED' || error.code === 'ECONNABORTED'));
     console.error('[Redmine tree v2] Load failed', {
@@ -700,6 +710,8 @@ export const getProjectTaskTreeOptimizedV2 = async (req: any, res: Response) => 
 
 export const getProjectTaskTree = async (req: any, res: Response) => {
   try {
+    const projectIds = parseProjectIds(req.query.projectIds, true);
+    if (projectIds?.length === 0) return res.json([]);
     const { projectName, taskName, taskDate, onlyShowMyTasks } = req.query;
 
     const forceReload = req.query.reload === 'true';
@@ -712,7 +724,7 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
       return res.status(400).json({ message: "Missing Redmine Configuration" });
     }
 
-    const cacheKey = `tree_cache_${account.redmineApiKey}_${isOnlyMyTasks ? 'mine' : 'all'}`;
+    const cacheKey = `${snapshotKey(normalizeUrl(account.redmineUrl), account.redmineApiKey, isOnlyMyTasks, undefined, false, projectIds)}:legacy:${JSON.stringify([projectName || '', taskName || '', taskDate || ''])}`;
 
     const redis = await getRedisClient();
 
@@ -726,18 +738,23 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
     // =========================================================
     // 1. LẤY TẤT CẢ PROJECTS (Dùng hàm helper song song mới)
     // =========================================================
-    const allProjects = await fetchRedmineDataParallel(
-      `${account.redmineUrl}/projects.json`,
-      account.redmineApiKey,
-      { status: REDMINE_PROJECT_STATUS.ACTIVE },
-      'projects'
-    );
+    const projectGroups = await Promise.all((projectIds ? [1, 5, 9] : [REDMINE_PROJECT_STATUS.ACTIVE]).map(status =>
+      fetchRedmineDataParallel(`${account.redmineUrl}/projects.json`, account.redmineApiKey, { status }, 'projects')
+        .catch(error => {
+          if (status !== 1 && axios.isAxiosError(error) && [403, 404].includes(error.response?.status || 0)) return [];
+          throw error;
+        })));
+    let allProjects = [...new Map(projectGroups.flat().map((project: any) => [project.id, project])).values()];
+    if (projectIds) {
+      const selected = new Set(expandProjectIds(projectIds, allProjects));
+      allProjects = allProjects.filter(project => selected.has(project.id) && (project.status === undefined || project.status === 1));
+    }
     const allProjectIds = new Set(allProjects.map((p: any) => p.id));
 
     // =========================================================
     // 2. LẤY TASKS (Tất cả hoặc của riêng tôi tùy param)
     // =========================================================
-    const taskParams: any = { status_id: "*" }; // Mặc định lấy tất cả các trạng thái
+    let taskParams: any = { status_id: "*" }; // Mặc định lấy tất cả các trạng thái
 
     // Nếu Client truyền onlyShowMyTasks = true thì mới filter theo ID của mình
     if (onlyShowMyTasks === 'true') {
@@ -746,12 +763,19 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
 
     if (taskDate) taskParams.created_on = taskDate;
 
-    let allTasks = await fetchRedmineDataParallel(
+    if (projectIds) taskParams = treeIssueParams({
+      projectIds: allProjects.map(project => project.id), onlyShowMyTasks: isOnlyMyTasks, projectName: '', taskName: '',
+      taskDate: String(taskDate || ''), compact: false, includeInactiveProjects: false,
+    }, allProjects);
+
+    let allTasks = projectIds && !allProjects.length ? [] : await fetchRedmineDataParallel(
       `${account.redmineUrl}/issues.json`,
       account.redmineApiKey,
       taskParams,
       'issues'
     );
+
+    if (projectIds) allTasks = allTasks.filter((task: any) => allProjectIds.has(task.project?.id));
 
     // --- CẢI TIẾN 1: Tìm kiếm Task theo ID hoặc Name ---
     if (taskName) {
@@ -833,6 +857,7 @@ export const getProjectTaskTree = async (req: any, res: Response) => {
     res.json(projectTree);
 
   } catch (error: any) {
+    if (error instanceof InvalidProjectIds) return res.status(400).json({ message: error.message });
     res.status(500).json({ message: "Failed to get projects tasks" });
   }
 };

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { expandProjectIds } from './projectIds.js';
 import { createHash } from 'node:crypto';
 import { setMaxListeners } from 'node:events';
 
@@ -9,6 +10,7 @@ export type TreeFilters = {
   taskName: string;
   taskDate: string;
   compact: boolean;
+  projectIds?: number[];
   createdSince?: string;
   includeInactiveProjects?: boolean;
 };
@@ -32,8 +34,8 @@ export function createTreeAbortController(concurrency: number) {
 }
 
 export function treeIssueParams(filters: TreeFilters, projects: RecordData[], updatedSince?: string): RecordData {
-  // Include-inactive mode keeps all visible issues. Only the explicit active
-  // scope restricts project IDs; date and assignee filters remain independent.
+  // Explicit selections and active-only mode restrict issues at Redmine before
+  // pagination; date and assignee filters remain independent.
   const params: RecordData = {
     status_id: '*', sort: 'id:desc',
     ...(filters.onlyShowMyTasks ? { assigned_to_id: 'me' } : {}),
@@ -42,19 +44,24 @@ export function treeIssueParams(filters: TreeFilters, projects: RecordData[], up
     // This Redmine accepts dates, not timestamps. The sync layer overlaps a day.
     ...(filters.createdSince && updatedSince ? { updated_on: `>=${updatedSince.slice(0, 10)}` } : {}),
   };
-  if (filters.includeInactiveProjects === false && !filters.taskDate) {
+  if (filters.projectIds !== undefined || (filters.includeInactiveProjects === false && !filters.taskDate)) {
     Object.assign(params, {
       set_filter: 1,
       'f[]': ['status_id', 'project_id'],
       'op[status_id]': '*',
       'op[project_id]': '=',
-      'v[project_id][]': projects.filter(project => project.status === undefined || project.status === 1).map(project => project.id),
+      'v[project_id][]': filters.projectIds !== undefined
+        ? expandProjectIds(filters.projectIds, projects as Array<{ id: number }>).filter(id => filters.includeInactiveProjects !== false || projects.some(project => project.id === id && (project.status === undefined || project.status === 1)))
+        : projects.filter(project => project.status === undefined || project.status === 1).map(project => project.id),
     });
     for (const field of ['assigned_to_id', 'created_on', 'updated_on']) {
       if (params[field] === undefined) continue;
       params['f[]'].push(field);
-      params[`op[${field}]`] = field === 'assigned_to_id' ? '=' : '>=';
-      params[`v[${field}][]`] = [field === 'assigned_to_id' ? params[field] : params[field].slice(2)];
+      const raw = String(params[field]);
+      const date = /^(>=|<=|><|>|<|=|!|\*)(.*)$/.exec(raw);
+      const symbolicDate = /^(t|ld|w|lw|l2w|m|lm|y|o|c|><t-|>t-|<t-|t-|><t\+|>t\+|<t\+|t\+)(\d*)$/.exec(raw);
+      params[`op[${field}]`] = field === 'assigned_to_id' ? '=' : symbolicDate?.[1] || date?.[1] || '=';
+      params[`v[${field}][]`] = (field === 'assigned_to_id' ? raw : symbolicDate?.[2] ?? date?.[2] ?? raw).split('|');
       delete params[field];
     }
   }
@@ -129,7 +136,8 @@ export async function fetchCollection(
 }
 
 export function buildProjectTaskTree(projects: RecordData[], issues: RecordData[], filters: TreeFilters) {
-  const allProjects = projects.filter(project => filters.includeInactiveProjects !== false || project.status === undefined || project.status === 1);
+  const selected = filters.projectIds === undefined ? undefined : new Set(expandProjectIds(filters.projectIds, projects as Array<{ id: number }>));
+  const allProjects = projects.filter(project => (!selected || selected.has(project.id)) && (filters.includeInactiveProjects !== false || project.status === undefined || project.status === 1));
   const projectNodes = new Map<number, RecordData>();
   const taskNodes = new Map<number, RecordData>();
   const roots: RecordData[] = [];
@@ -140,6 +148,7 @@ export function buildProjectTaskTree(projects: RecordData[], issues: RecordData[
   }
   const search = filters.taskName.toLowerCase();
   for (const task of issues) {
+    if (selected && !selected.has(task.project?.id)) continue;
     if (!task.project?.id) throw new Error('Redmine issue has no project reference');
     if (!projectNodes.has(task.project.id)) {
       if (filters.includeInactiveProjects === false) continue;

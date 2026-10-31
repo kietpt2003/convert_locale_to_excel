@@ -27,6 +27,10 @@ import { initUserGuide } from "./userGuide.js";
 const token = localStorage.getItem("app_token");
 let TRACKERS_CACHE = [];
 let globalProjectTreeData = null;
+let favoriteProjectIds = [];
+let favoriteSaving = false;
+let explorerLoading = false;
+let explorerRequest = null;
 
 // Use this function to navigate and remove token in admin-redmine
 export async function fetchWithAuth(url, options = {}) {
@@ -523,6 +527,7 @@ function renderProjectNodes(projects, parentElement, pQuery, tQuery) {
     li.innerHTML = `
       <div class="tree-row">
         <span class="toggle-icon">▶</span>
+        <button type="button" class="project-favorite"></button>
         <span class="icon">📁</span>
         <span class="label project-name">
           [<a href="${projectLink}" target="_blank" class="project-id-link" onclick="event.stopPropagation()">#${highlightedProjectId}</a>] 
@@ -532,6 +537,19 @@ function renderProjectNodes(projects, parentElement, pQuery, tQuery) {
       </div>
       <ul class="sub-tree"></ul>
     `;
+
+    const favoriteButton = li.querySelector(".project-favorite");
+    const isFavorite = favoriteProjectIds.includes(proj.id);
+    favoriteButton.textContent = isFavorite ? '★' : '☆';
+    favoriteButton.classList.toggle('is-favorite', isFavorite);
+    favoriteButton.setAttribute('aria-pressed', String(isFavorite));
+    favoriteButton.setAttribute('aria-label', `${isFavorite ? 'Remove' : 'Add'} ${proj.name} ${isFavorite ? 'from' : 'to'} favorites`);
+    favoriteButton.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+    favoriteButton.disabled = favoriteSaving || explorerLoading;
+    favoriteButton.addEventListener('click', event => {
+      event.stopPropagation();
+      toggleProjectFavorite(proj.id);
+    });
 
     const subTreeUl = li.querySelector(".sub-tree");
     const treeRow = li.querySelector(".tree-row");
@@ -683,62 +701,96 @@ function renderTaskNodes(tasks, parentElement, tQuery) {
   });
 }
 
-export async function loadFullProjectTree(forceReload = false) {
-  const container = document.getElementById("projectTreeContainer");
-  const isOnlyMine = document.getElementById("chkOnlyMyTasks").checked;
-  const recentOnly = document.getElementById("chkRecentTasks").checked;
-  const includeInactiveProjects = document.getElementById("chkInactiveProjects").checked;
-
-  if (forceReload) {
-    globalProjectTreeData = null;
+function updateFavoriteControls() {
+  for (const id of ['chkOnlyMyTasks', 'chkRecentTasks', 'chkInactiveProjects', 'chkFavoriteProjects', 'btnReloadTree']) {
+    document.getElementById(id).disabled = favoriteSaving;
   }
+  document.querySelectorAll('.project-favorite').forEach(button => {
+    button.disabled = favoriteSaving || explorerLoading;
+  });
+}
 
-  // Mỗi lần mở hoặc tải lại đều kiểm tra thay đổi mới nhất qua Redmine.
-  {
-    container.style.opacity = "0.5";
-    const iconSvg = document.getElementById("iconReloadTree");
-    let waitTimeout;
+async function toggleProjectFavorite(projectId) {
+  if (favoriteSaving || explorerLoading) return;
+  favoriteSaving = true;
+  updateFavoriteControls();
+  const error = document.getElementById('favoriteProjectsError');
+  error.hidden = true;
+  try {
+    const removing = favoriteProjectIds.includes(projectId);
+    const response = await fetchWithAuth('/api/redmine/projects/favorites', {
+      method: removing ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectIds: removing ? favoriteProjectIds.filter(id => id !== projectId) : [projectId] }),
+    });
+    if (!response.ok) throw new Error('Failed to save favorite projects');
+    favoriteProjectIds = (await response.json()).projectIds;
+    favoriteSaving = false;
+    if (document.getElementById('chkFavoriteProjects').checked) await loadFullProjectTree();
+    else executeLocalSearch();
+  } catch (err) {
+    error.textContent = 'Unable to save favorite projects. Please try again.';
+    error.hidden = false;
+  } finally {
+    favoriteSaving = false;
+    updateFavoriteControls();
+  }
+}
 
-    try {
-      if (iconSvg) iconSvg.style.animation = "spin 1s linear infinite";
-
-      waitTimeout = setTimeout(() => {
-        container.innerHTML =
-          '<div class="loading-state" style="padding: 20px; text-align: center; color: #64748b;">Your company has lots of tasks, please wait until we can get all for you...</div>';
-      }, 15000);
-
-      const response = await fetchWithAuth(
-        `/api/redmine/v2/projects/tasks?reload=${forceReload}&onlyShowMyTasks=${isOnlyMine}&recentOnly=${recentOnly}&includeInactiveProjects=${includeInactiveProjects}&compact=true`,
-      );
+export async function loadFullProjectTree(forceReload = false) {
+  if (favoriteSaving) return;
+  explorerRequest?.abort();
+  const request = new AbortController();
+  explorerRequest = request;
+  const container = document.getElementById('projectTreeContainer');
+  const iconSvg = document.getElementById('iconReloadTree');
+  const isOnlyMine = document.getElementById('chkOnlyMyTasks').checked;
+  const recentOnly = document.getElementById('chkRecentTasks').checked;
+  const includeInactiveProjects = document.getElementById('chkInactiveProjects').checked;
+  const favoritesOnly = document.getElementById('chkFavoriteProjects').checked;
+  globalProjectTreeData = null;
+  explorerLoading = true;
+  updateFavoriteControls();
+  container.style.opacity = '0.5';
+  document.getElementById('lastUpdatedTime').innerText = '--';
+  if (iconSvg) iconSvg.style.animation = 'spin 1s linear infinite';
+  const waitTimeout = setTimeout(() => {
+    if (explorerRequest === request) container.textContent = 'Loading projects and tasks from Redmine...';
+  }, 15000);
+  try {
+    const favorites = await fetchWithAuth('/api/redmine/projects/favorites', { signal: request.signal });
+    if (!favorites.ok) throw new Error('Failed to load favorite projects');
+    const favoriteData = await favorites.json();
+    if (request.signal.aborted || explorerRequest !== request) return;
+    favoriteProjectIds = favoriteData.projectIds;
+    const params = new URLSearchParams({
+      reload: String(forceReload), onlyShowMyTasks: String(isOnlyMine),
+      recentOnly: String(recentOnly), includeInactiveProjects: String(includeInactiveProjects), compact: 'true',
+    });
+    if (favoritesOnly) params.set('projectIds', favoriteProjectIds.join(','));
+    let tree = [];
+    if (!favoritesOnly || favoriteProjectIds.length) {
+      const response = await fetchWithAuth(`/api/redmine/v2/projects/tasks?${params}`, { signal: request.signal });
       if (!response.ok) throw new Error('Failed to refresh Redmine tasks');
-
-      clearTimeout(waitTimeout);
-
-      globalProjectTreeData = await response.json();
-
-      const now = new Date();
-      const timeString = now.toLocaleString("vi-VN", {
-        hour12: false,
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-      document.getElementById("lastUpdatedTime").innerText = timeString;
-    } catch (error) {
-      container.innerHTML = '<div class="error-state">Error loading data</div>';
-      return;
-    } finally {
-      clearTimeout(waitTimeout);
-      if (iconSvg) iconSvg.style.animation = "none";
-      container.style.opacity = "1"; // Trả lại độ sáng
+      tree = await response.json();
+    }
+    if (request.signal.aborted || explorerRequest !== request) return;
+    globalProjectTreeData = tree;
+    document.getElementById('lastUpdatedTime').innerText = new Date().toLocaleString('vi-VN', { hour12: false });
+    executeLocalSearch();
+  } catch (error) {
+    if (!request.signal.aborted && explorerRequest === request) {
+      container.innerHTML = '<div class="error-state">Unable to load projects and favorites. Please try Refresh.</div>';
+    }
+  } finally {
+    clearTimeout(waitTimeout);
+    if (explorerRequest === request) {
+      explorerLoading = false;
+      updateFavoriteControls();
+      if (iconSvg) iconSvg.style.animation = 'none';
+      container.style.opacity = '1';
     }
   }
-
-  // 2. CHẠY HÀM LỌC LOCAL
-  executeLocalSearch();
 }
 
 function executeLocalSearch() {
@@ -817,7 +869,9 @@ function executeLocalSearch() {
 
   if (filteredData.length === 0) {
     container.innerHTML =
-      '<div class="empty-state" style="padding:15px;text-align:center;color:#64748b;">No matching data found</div>';
+      document.getElementById('chkFavoriteProjects').checked && !favoriteProjectIds.length
+        ? '<div class="empty-state">No favorite projects yet. Turn off Only favorite projects and click a project’s star.</div>'
+        : '<div class="empty-state">No matching data found</div>';
     return;
   }
 
@@ -947,6 +1001,9 @@ document
 document
   .getElementById("chkInactiveProjects")
   .addEventListener("change", () => loadFullProjectTree(true));
+
+document.getElementById('chkFavoriteProjects')
+  .addEventListener('change', () => loadFullProjectTree());
 
 export function showLoadingOverlay(
   message = "It's being processed, please wait...",

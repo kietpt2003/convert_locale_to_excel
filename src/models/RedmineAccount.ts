@@ -8,6 +8,7 @@ const redmineAccountSchema = new mongoose.Schema({
   sessionCookie: { type: String },
   lastLogin: { type: Date },
   redmineApiKey: { type: String, default: "" },
+  favoriteProjectIds: { type: [Number], default: [] },
   watchedProjectIds: { type: [String], default: [] },
   namingTemplate: { type: String, default: "" },
   redmineUserId: { type: Number },

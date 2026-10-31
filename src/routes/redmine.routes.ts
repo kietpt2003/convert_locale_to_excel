@@ -29,10 +29,15 @@ import {
 } from '../controllers/redmine.controller.js';
 import { createDraft, deleteDraft, executeDraftMatch, getDrafts } from '../controllers/draft.controller.js';
 import { checkPremiumAccess } from '../middleware/authPremium.js';
+import { getFavoriteProjects, addFavoriteProjects, updateFavoriteProjects } from '../controllers/projectFavorite.controller.js';
 
 const router = Router();
 
 router.use(verifyToken, checkPremiumAccess);
+
+router.get('/projects/favorites', getFavoriteProjects);
+router.post('/projects/favorites', addFavoriteProjects);
+router.patch('/projects/favorites', updateFavoriteProjects);
 
 router.post('/logtime', logTime);
 router.get('/projects/:projectId/tasks', getTasks);

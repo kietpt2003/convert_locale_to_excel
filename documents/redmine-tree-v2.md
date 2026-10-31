@@ -193,3 +193,89 @@ node --require ../my-only-tool/.pnp.cjs tests/webExplorerScope.smoke.cjs ../my-o
 
 Direct Chrome interaction/layout has not been verified. Web TypeScript and production
 Webpack build pass; Webpack retains existing bundle/image size warnings.
+
+## Favorite projects and explicit project selection
+
+These endpoints share the existing JWT and premium checks. Favorites are stored
+on the authenticated user's Redmine account, separately from `watchedProjectIds`.
+Existing accounts start with an empty list; no migration is needed.
+
+| Method | Path | Body | Behavior |
+| --- | --- | --- | --- |
+| GET | `/api/redmine/projects/favorites` | none | Read favorite project IDs |
+| POST | `/api/redmine/projects/favorites` | `{"projectIds":[12,34]}` | Add IDs atomically without duplicates |
+| PATCH | `/api/redmine/projects/favorites` | `{"projectIds":[34]}` | Replace the entire list (removes 12 in this example) |
+
+All three return `{"projectIds":[34]}` with the resulting sorted list. PATCH with
+`{"projectIds":[]}` clears favorites. IDs must be positive safe integers (numeric
+strings are also accepted); malformed or missing write payloads return HTTP 400.
+An unlinked Redmine account returns HTTP 400. Favorites store IDs only and do not
+grant Redmine access or automatically change task queries.
+
+Pass favorites, or any selected project IDs, to either existing tree endpoint:
+
+```text
+GET /api/redmine/v2/projects/tasks?projectIds=12,34&recentOnly=true
+GET /api/redmine/projects/tasks?projectIds=12&projectIds=34
+```
+
+Omitting `projectIds` preserves the current unrestricted selection. Explicit
+`projectIds=` selects nothing and returns `[]` without scanning Redmine. Invalid
+IDs return HTTP 400. The list is deduplicated and sorted before use. Selection
+includes each selected project and all accessible descendants at every depth.
+Favorite storage still contains only explicitly starred IDs; descendants are
+included automatically while filtering. A selected child with an unselected parent becomes a root in the response.
+Active-only mode still excludes inactive projects, even when selected.
+
+Project filtering is sent to Redmine's native issue query before pagination,
+including full loads, delta loads, count checks and custom `taskDate` queries.
+Date, assignee and inactive filters continue to combine independently. Response
+building also enforces the selection. Cache/snapshot scopes include the normalized
+root IDs so switching favorite selections cannot reuse another selection's tasks.
+The project-subtree scope marker invalidates older exact-ID snapshots. Hierarchy
+metadata includes inactive projects when resolving a subtree, so an active
+grandchild remains reachable through an inactive intermediate parent; task
+results still respect the active/inactive filter.
+Legacy tree cache keys also include search/date filters to avoid mixing queries.
+
+Validation for this addition includes mocked favorite storage/owner isolation,
+ID validation, native query parameters, response selection and snapshot isolation,
+plus local HTTP full/delta/count requests. These fixtures do not measure live
+Redmine performance or replace testing against the deployed MongoDB/Redmine.
+
+
+## Explorer favorite controls
+
+Both the React Explorer in `my-only-tool` and the built-in admin Explorer show a
+star button on every project row, including nested projects. Outlined stars add
+favorites with POST; filled amber stars remove them with PATCH. Clicking the
+button does not expand/collapse the project. Stars change only after the server
+confirms the save; errors retain the previous selection and display a message.
+Writes are serialized in each Explorer by disabling favorite/filter controls
+while saving, preventing overlapping replacement lists from losing selections.
+
+On opening the React Explorer, **Only Favorite Projects** defaults on when the
+authenticated account has at least one favorite, otherwise off. Manual changes
+remain in effect during Sync and other filter changes in that Explorer session.
+When enabled,
+tree requests send the saved favorite IDs through `projectIds`, alongside the
+existing date/assignee/inactive filters. Removing a favorite reloads the remaining
+selection. An empty favorite list displays instructions to turn off the filter
+and select stars; it does not trigger an unrestricted issue scan. Sync/remount
+refresh favorite IDs from the authenticated account, and abandoned tree requests
+are cancelled so old scope responses cannot overwrite the current selection.
+
+DOM regression checks use the actual React component/API service and the actual
+admin HTML/JavaScript with mocked HTTP responses:
+
+```sh
+node --require ../my-only-tool/.pnp.cjs tests/webExplorerScope.smoke.cjs ../my-only-tool /private/tmp/redmine-scope-ui-check/node_modules/jsdom
+node tests/legacyExplorerFavorites.smoke.cjs /private/tmp/redmine-scope-ui-check/node_modules/jsdom
+```
+
+These checks cover stars on nested projects, save failure, favorite-only request
+parameters, removal while filtered, empty lists, returning to all projects, and
+late responses. React checks also cover remount and existing date/inactive filters.
+TypeScript and the production Webpack build pass. Visual interaction in Chrome
+and authenticated favorite writes against the deployed API have not been verified.
+Deploy the new favorite endpoints before publishing either updated Explorer.

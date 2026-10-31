@@ -120,3 +120,48 @@ test('recent HTTP reload includes a new unassigned task; toggling off restores o
     await new Promise<void>(resolve => server.close(() => resolve()));
   }
 });
+
+test('favorite parent scope includes descendant tasks in HTTP full/delta/count queries and excludes unrelated projects', async () => {
+  const projects = [{ id: 1, name: 'Other' }, { id: 2, name: 'Selected' }, { id: 3, name: 'Child', parent: { id: 2 } }, { id: 4, name: 'Grandchild', parent: { id: 3 } }];
+  const items = projects.map(project => ({ id: project.id * 10, subject: project.name, project: { id: project.id } }));
+  const requests: URL[] = [];
+  const server = createServer((request, response) => {
+    const url = new URL(request.url!, 'http://localhost');
+    requests.push(url);
+    const selected = url.searchParams.getAll('v[project_id][]').map(Number);
+    const issues = items.filter(item => selected.includes(item.project.id));
+    const limit = Number(url.searchParams.get('limit'));
+    response.setHeader('Content-Type', 'application/json');
+    response.end(JSON.stringify({ issues: issues.slice(0, limit), total_count: issues.length, limit }));
+  });
+  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+  assert.ok(address && typeof address !== 'string');
+  const filters: TreeFilters = { projectIds: [2], projectName: '', taskName: '', taskDate: '', compact: false, onlyShowMyTasks: true, includeInactiveProjects: true, createdSince: '2026-08-31' };
+  const base = `http://127.0.0.1:${address.port}/issues.json`;
+  const source: SyncSource = {
+    projects: async () => ({ items: projects, serverDate: 'Sat, 31 Oct 2026 00:00:00 GMT' }),
+    tasks: (projects, since) => fetchCollection(base, 'test', treeIssueParams(filters, projects, since), 'issues', createRequestPool(1), 1),
+    count: async projects => (await axios.get(base, { params: { ...treeIssueParams(filters, projects), limit: 1 } })).data.total_count,
+  };
+  try {
+    const first = await synchronizeTasks(undefined, source);
+    const second = await synchronizeTasks(first.snapshot, source);
+    assert.equal(second.mode, 'DELTA');
+    assert.deepEqual(second.snapshot.tasks.map(task => task.id), [40, 30, 20]);
+    assert.equal(requests.length, 3);
+    for (const request of requests) {
+      assert.deepEqual(request.searchParams.getAll('v[project_id][]'), ['2', '3', '4']);
+      assert.equal(request.searchParams.get('op[project_id]'), '=');
+      assert.deepEqual(request.searchParams.getAll('v[assigned_to_id][]'), ['me']);
+    }
+    assert.ok(requests[1].searchParams.getAll('f[]').includes('updated_on'));
+    const tree = buildProjectTaskTree(projects, second.snapshot.tasks, filters);
+    assert.deepEqual(tree.map(project => project.id), [2]);
+    assert.equal(tree[0].subProjects[0].tasks[0].id, 30);
+    assert.equal(tree[0].subProjects[0].subProjects[0].tasks[0].id, 40);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+  }
+});
